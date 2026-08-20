@@ -1,0 +1,52 @@
+[package]
+name = "skyport"
+version = "0.1.0"
+edition = "2021"
+description = "Local-first universal AI gateway/runtime"
+license = "MIT"
+
+[[bin]]
+name = "skyport"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "process", "signal", "sync", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+rpassword = "7"
+toml = "0.8"
+aes-gcm = "0.10"
+zeroize = { version = "1", features = ["derive"] }
+rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl"] }
+rust-embed = { version = "8", features = ["compression"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+rand = "0.8"
+base64 = "0.22"
+sha2 = "0.10"
+subtle = "2"
+futures = "0.3"
+async-stream = "0.3"
+tokio-stream = "0.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs = "5"
+open = "5"
+bytes = "1"
+url = "2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native"] }
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+keyring = { version = "3", default-features = false, features = ["sync-secret-service"] }
+
+[dev-dependencies]
+tempfile = "3"
+wiremock = "0.6"
