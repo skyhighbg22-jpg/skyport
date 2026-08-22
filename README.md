@@ -13,12 +13,50 @@ Local-first proxy and control plane that sits between your tools and AI provider
 - **Skills** — One-click enable/disable of all 341 official [NVIDIA/skills](https://github.com/NVIDIA/skills) + custom `npx skills` packages, installed globally for every supported agent
 - **Web dashboard** — Single-file `static/index.html` embedded in the binary
 
+## Install
+
+**npm / yarn / pnpm / bun**
+```bash
+npm install -g skyport
+# or
+yarn global add skyport
+pnpm add -g skyport
+bun add -g skyport
+npx skyport serve
+```
+
+**cargo (Rust)**
+```bash
+cargo install skyport
+cargo install --git https://github.com/skyhighbg22-jpg/skyport.git
+```
+
+**Homebrew**
+```bash
+brew tap skyhighbg22-jpg/skyport
+brew install skyport
+```
+
+**One-liner (macOS / Linux)**
+```bash
+curl -fsSL https://raw.githubusercontent.com/skyhighbg22-jpg/skyport/main/install.sh | sh
+```
+
+**One-liner (Windows PowerShell)**
+```powershell
+irm https://raw.githubusercontent.com/skyhighbg22-jpg/skyport/main/install.ps1 | iex
+```
+
+**From source**
+```bash
+git clone https://github.com/skyhighbg22-jpg/skyport.git
+cd skyport
+cargo build --release
+```
+
 ## Quick start
 
 ```bash
-cargo build --release
-cargo run --release -- serve
-# or after install
 skyport serve
 ```
 

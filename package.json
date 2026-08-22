@@ -1,0 +1,27 @@
+{
+  "name": "skyport",
+  "version": "0.1.0",
+  "description": "Local-first universal AI gateway — OpenAI-compatible proxy, cost tracking, and skills on 127.0.0.1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skyhighbg22-jpg/skyport.git"
+  },
+  "homepage": "https://github.com/skyhighbg22-jpg/skyport#readme",
+  "bugs": "https://github.com/skyhighbg22-jpg/skyport/issues",
+  "keywords": ["ai", "gateway", "proxy", "openai", "llm", "cli"],
+  "bin": {
+    "skyport": "./bin/skyport.js"
+  },
+  "files": ["bin/", "install.js", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "postinstall": "node install.js",
+    "prepack": "node -e \"if(!require('fs').existsSync('./bin/skyport'+(process.platform==='win32'?'.exe':'')))console.warn('[skyport] binary not present — will be downloaded on postinstall')\""
+  },
+  "preferGlobal": true,
+  "os": ["darwin", "linux", "win32"],
+  "cpu": ["x64", "arm64"]
+}

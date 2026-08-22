@@ -1,0 +1,11 @@
+/target
+/.skyport
+/src
+/static
+/ui
+/.git
+/.github
+Cargo.lock
+*.db
+*.log
+.env

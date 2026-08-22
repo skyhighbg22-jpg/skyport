@@ -2,8 +2,14 @@
 name = "skyport"
 version = "0.1.0"
 edition = "2021"
-description = "Local-first universal AI gateway/runtime"
+description = "Local-first universal AI gateway/runtime — OpenAI-compatible proxy, cost tracking, and skills on 127.0.0.1"
 license = "MIT"
+repository = "https://github.com/skyhighbg22-jpg/skyport"
+homepage = "https://github.com/skyhighbg22-jpg/skyport"
+readme = "README.md"
+keywords = ["ai", "gateway", "proxy", "openai", "llm"]
+categories = ["command-line-utilities", "web-programming"]
+exclude = ["/target", "/.skyport", "*.db", ".env"]
 
 [[bin]]
 name = "skyport"

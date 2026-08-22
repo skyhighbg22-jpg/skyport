@@ -21,3 +21,7 @@ skyport.pid
 config.toml
 *.db
 *.db-journal
+/bin/skyport
+/bin/skyport-*
+/bin/*.exe
+*.tgz
