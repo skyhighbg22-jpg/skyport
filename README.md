@@ -12,6 +12,7 @@ Local-first proxy and control plane that sits between your tools and AI provider
 - **Telemetry** — Token counts, latency, cost, and request log in SQLCipher-encrypted SQLite
 - **Skills** — One-click enable/disable of all 341 official [NVIDIA/skills](https://github.com/NVIDIA/skills) + custom `npx skills` packages, installed globally for every supported agent
 - **Web dashboard** — Single-file `static/index.html` embedded in the binary
+- **Verified releases** — Every downloaded binary is checked against the release's SHA-256 manifest before installation
 
 ## Install
 
@@ -96,6 +97,8 @@ skyport providers                   # test credentials / discover models
 
 Inference clients use `Authorization: Bearer <inference-token>` against `http://127.0.0.1:5790/v1/*`.
 
+`GET /healthz` is intentionally unauthenticated on loopback and identifies the running Skyport version and PID. The `status`, `ui`, and `stop` commands use it to verify they are talking to the real gateway—even after a configured port change.
+
 ## Skills
 
 - Catalog is fetched from `NVIDIA/skills` on demand and cached in `~/.skyport/skyport.db` (encrypted).
@@ -113,9 +116,10 @@ See [SECURITY.md](SECURITY.md). Highlights: HTTPS required for credentialed prov
 
 ```bash
 cargo fmt --check
-cargo test          # 95 tests
+cargo test --locked # 100 Rust tests
 cargo clippy --all-targets --all-features -- -A clippy::collapsible-if -A clippy::too-many-arguments -A clippy::redundant-locals -D warnings
 cargo build --release
+npm test            # installer target and checksum parsing
 ```
 
 ## License

@@ -71,7 +71,7 @@ pub async fn get_status(State(state): State<AppState>) -> impl IntoResponse {
 
     Json(serde_json::json!(StatusResponse {
         status: "ok".to_string(),
-        version: "0.1.0".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
         uptime_seconds: uptime,
         providers,
         in_flight: state.in_flight.load(std::sync::atomic::Ordering::Relaxed),

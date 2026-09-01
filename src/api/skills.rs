@@ -464,7 +464,7 @@ pub async fn import_custom_skill(
     } else {
         source
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or(source)
             .trim_end_matches(".git")
             .to_string()

@@ -147,21 +147,48 @@ pub fn config_dir() -> PathBuf {
     dirs::home_dir().unwrap().join(".skyport")
 }
 
-pub fn write_pid(pid: u32) -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RuntimeInfo {
+    pub pid: u32,
+    #[serde(default)]
+    pub port: Option<u16>,
+}
+
+pub fn write_pid(pid: u32, port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let dir = config_dir();
     crate::vault::ensure_secure_directory(&dir)?;
-    crate::vault::atomic_write(&dir.join("skyport.pid"), pid.to_string().as_bytes())?;
+    let runtime = serde_json::to_vec(&RuntimeInfo {
+        pid,
+        port: Some(port),
+    })?;
+    crate::vault::atomic_write(&dir.join("skyport.pid"), &runtime)?;
     Ok(())
 }
 
-pub fn read_pid() -> Result<u32, Box<dyn std::error::Error>> {
+pub fn read_runtime_info() -> Result<RuntimeInfo, Box<dyn std::error::Error>> {
     let path = config_dir().join("skyport.pid");
     crate::vault::reject_symlink(&path)?;
     let value = std::fs::read_to_string(path)?;
-    if value.len() > 20 {
+    if value.len() > 256 {
         return Err("Invalid PID file".into());
     }
-    Ok(value.trim().parse()?)
+    parse_runtime_info(&value)
+}
+
+pub fn read_pid() -> Result<u32, Box<dyn std::error::Error>> {
+    Ok(read_runtime_info()?.pid)
+}
+
+fn parse_runtime_info(value: &str) -> Result<RuntimeInfo, Box<dyn std::error::Error>> {
+    let value = value.trim();
+    let runtime = match value.parse::<u32>() {
+        Ok(pid) => RuntimeInfo { pid, port: None },
+        Err(_) => serde_json::from_str::<RuntimeInfo>(value)?,
+    };
+    if runtime.pid == 0 || runtime.port.is_some_and(|port| port < 1024) {
+        return Err("Invalid PID file".into());
+    }
+    Ok(runtime)
 }
 
 pub fn remove_pid() {
@@ -461,5 +488,25 @@ mod tests {
         let serialized = toml::to_string(&config).unwrap();
         assert!(!serialized.contains("disk_fingerprint"));
         assert_ne!(file_fingerprint(b"first"), file_fingerprint(b"second"));
+    }
+
+    #[test]
+    fn runtime_info_supports_current_and_legacy_pid_files() {
+        assert_eq!(
+            parse_runtime_info(r#"{"pid":42,"port":5790}"#).unwrap(),
+            RuntimeInfo {
+                pid: 42,
+                port: Some(5790)
+            }
+        );
+        assert_eq!(
+            parse_runtime_info("42\n").unwrap(),
+            RuntimeInfo {
+                pid: 42,
+                port: None
+            }
+        );
+        assert!(parse_runtime_info(r#"{"pid":0,"port":5790}"#).is_err());
+        assert!(parse_runtime_info(r#"{"pid":42,"port":80}"#).is_err());
     }
 }

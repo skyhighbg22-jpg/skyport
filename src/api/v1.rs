@@ -13,6 +13,29 @@ static UPSTREAM_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_ne
 static BUDGET_GATE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 const MAX_SSE_EVENT_BYTES: usize = 1024 * 1024;
 
+struct InFlightGuard {
+    counter: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl InFlightGuard {
+    fn new(counter: std::sync::Arc<std::sync::atomic::AtomicUsize>) -> Self {
+        counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Self { counter }
+    }
+}
+
+impl Drop for InFlightGuard {
+    fn drop(&mut self) {
+        self.counter
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+struct StreamLease {
+    _permit: tokio::sync::SemaphorePermit<'static>,
+    _in_flight: InFlightGuard,
+}
+
 use crate::{
     api::AppState,
     db::{self, RequestLogEntry},
@@ -73,7 +96,7 @@ async fn proxy(
         return response;
     }
 
-    let _permit = match UPSTREAM_SLOTS.try_acquire() {
+    let permit = match UPSTREAM_SLOTS.try_acquire() {
         Ok(permit) => permit,
         Err(_) => {
             return openai_error(
@@ -171,7 +194,7 @@ async fn proxy(
                 }
             };
             let rpm = budget_for(&config, &provider, &decision.key_alias)
-                .and_then(|(budget, _)| budget.max_rpm);
+                .and_then(|(budget, key_scoped)| budget.max_rpm.map(|rpm| (rpm, key_scoped)));
             let blocked_by_budget = match budget_for(&config, &provider, &decision.key_alias) {
                 Some((budget, _))
                     if (budget.monthly_cap_usd.is_some() || budget.daily_cap_usd.is_some())
@@ -201,14 +224,22 @@ async fn proxy(
                                     prices.estimate_cost(prompt_bound, completion_bound)
                                 })
                                 .unwrap_or(f64::INFINITY);
-                            !db::check_budget(
+                            match db::check_budget(
                                 &db,
                                 &provider,
                                 key_scoped.then_some(decision.key_alias.as_str()),
                                 budget,
                                 projected_cost,
-                            )
-                            .unwrap_or(true)
+                            ) {
+                                Ok(within_budget) => !within_budget,
+                                Err(_) => {
+                                    return openai_error(
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        "Could not verify the configured budget",
+                                        "budget_check_failed",
+                                    )
+                                }
+                            }
                         }
                         Err(_) => {
                             return openai_error(
@@ -230,8 +261,12 @@ async fn proxy(
                 "budget_exceeded",
             );
         }
-        if let Some(rpm) = scoped_rpm {
-            let scope_key = format!("{}:{}", provider, decision.key_alias);
+        if let Some((rpm, key_scoped)) = scoped_rpm {
+            let scope_key = if key_scoped {
+                format!("{}:{}", provider, decision.key_alias)
+            } else {
+                provider.clone()
+            };
             if let Err(exceeded) = state.rate_limiter.check_scoped(&scope_key, Some(rpm)) {
                 let mut response = openai_error(
                     StatusCode::TOO_MANY_REQUESTS,
@@ -358,17 +393,16 @@ async fn proxy(
                 request = request.header(name, value);
             }
         }
-        state
-            .in_flight
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let in_flight = InFlightGuard::new(state.in_flight.clone());
         let send_result = request.send().await;
-        state
-            .in_flight
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         match send_result {
             Ok(upstream) if upstream.status().is_success() => {
                 state.router.mark_key_success(&decision.key_alias);
                 if stream {
+                    let lease = StreamLease {
+                        _permit: permit,
+                        _in_flight: in_flight,
+                    };
                     return match decision.format.as_str() {
                         "anthropic" | "gemini" => translate_native_stream(
                             upstream
@@ -381,6 +415,7 @@ async fn proxy(
                             actual_model.clone(),
                             start,
                             Some(body.clone()),
+                            lease,
                         ),
                         "responses" => translate_responses_stream(
                             upstream
@@ -392,6 +427,7 @@ async fn proxy(
                             actual_model.clone(),
                             start,
                             Some(body.clone()),
+                            lease,
                         ),
                         _ => logged_passthrough_stream(
                             upstream
@@ -403,6 +439,7 @@ async fn proxy(
                             actual_model.clone(),
                             start,
                             Some(body.clone()),
+                            lease,
                         ),
                     };
                 }
@@ -511,11 +548,13 @@ fn translate_native_stream<S>(
     model: String,
     start: Instant,
     request_body: Option<Value>,
+    lease: StreamLease,
 ) -> Response
 where
     S: futures::Stream<Item = Result<Bytes, axum::Error>> + Send + 'static,
 {
     let stream = async_stream::stream! {
+        let _lease = lease;
         let mut pending = String::new();
         let mut source = std::pin::pin!(source);
         let mut done = false;
@@ -581,11 +620,13 @@ fn translate_responses_stream<S>(
     model: String,
     start: Instant,
     request_body: Option<Value>,
+    lease: StreamLease,
 ) -> Response
 where
     S: futures::Stream<Item = Result<Bytes, axum::Error>> + Send + 'static,
 {
     let stream = async_stream::stream! {
+        let _lease = lease;
         let mut pending = String::new();
         let mut source = std::pin::pin!(source);
         let mut done = false;
@@ -648,11 +689,13 @@ fn logged_passthrough_stream<S>(
     model: String,
     start: Instant,
     request_body: Option<Value>,
+    lease: StreamLease,
 ) -> Response
 where
     S: futures::Stream<Item = Result<Bytes, axum::Error>> + Send + 'static,
 {
     let stream = async_stream::stream! {
+        let _lease = lease;
         let mut source = std::pin::pin!(source);
         let mut pending = String::new();
         let mut prompt_tokens = 0;
@@ -830,22 +873,31 @@ fn log_tokens(state: &AppState, log: TokenLog<'_>) {
         completion_tokens: log.completion,
         est_cost_usd: cost,
     };
-    if let Ok(db) = state.db.lock() {
-        let _ = db::log_request(&db, &entry);
-        let _ = db::update_budget_usage(
-            &db,
-            log.provider,
-            log.alias,
-            &chrono::Utc::now().format("%Y-%m").to_string(),
-            cost,
-        );
-        let _ = db::update_budget_usage(
-            &db,
-            log.provider,
-            log.alias,
-            &chrono::Utc::now().format("%Y-%m-%d").to_string(),
-            cost,
-        );
+    if let Ok(mut db) = state.db.lock() {
+        let now = chrono::Utc::now();
+        let write_result = (|| -> Result<(), Box<dyn std::error::Error>> {
+            let transaction = db.transaction()?;
+            db::log_request(&transaction, &entry)?;
+            db::update_budget_usage(
+                &transaction,
+                log.provider,
+                log.alias,
+                &now.format("%Y-%m").to_string(),
+                cost,
+            )?;
+            db::update_budget_usage(
+                &transaction,
+                log.provider,
+                log.alias,
+                &now.format("%Y-%m-%d").to_string(),
+                cost,
+            )?;
+            transaction.commit()?;
+            Ok(())
+        })();
+        if let Err(error) = write_result {
+            tracing::error!(%error, "failed to atomically persist telemetry and budget usage");
+        }
     }
     let empty_body = serde_json::json!({});
     let body = log.request_body.unwrap_or(&empty_body);
@@ -1742,7 +1794,7 @@ data: {}
         let state = state(&server);
         make_responses_provider(&state, server.uri(), false);
         let response = chat_completions(
-            State(state),
+            State(state.clone()),
             Json(ChatRequest {
                 model: "mock/test-model".to_string(),
                 messages: vec![],
@@ -1755,9 +1807,19 @@ data: {}
         )
         .await;
         assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            state.in_flight.load(std::sync::atomic::Ordering::Relaxed),
+            1,
+            "a streaming request must stay in flight until its body is consumed"
+        );
         let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
             .await
             .unwrap();
+        assert_eq!(
+            state.in_flight.load(std::sync::atomic::Ordering::Relaxed),
+            0,
+            "consuming the stream must release its in-flight lease"
+        );
         let events = String::from_utf8(bytes.to_vec()).unwrap();
         assert!(events.contains(r#""content":"hi""#));
         assert!(events.contains(r#""finish_reason":"stop""#));

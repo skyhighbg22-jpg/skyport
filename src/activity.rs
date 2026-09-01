@@ -15,6 +15,16 @@ use serde_json::Value;
 use crate::api::AppState;
 use crate::db::{self, ActivityEntry};
 
+const MAX_ACTIONS_PER_REQUEST: usize = 32;
+const MAX_TOOL_NAME_CHARS: usize = 128;
+const MAX_PATH_CHARS: usize = 256;
+const MAX_QUERY_CHARS: usize = 256;
+const MAX_TITLE_CHARS: usize = 160;
+const MAX_DETAIL_CHARS: usize = 2_048;
+const MAX_METADATA_VALUE_CHARS: usize = 1_024;
+const MAX_METADATA_JSON_CHARS: usize = 4_096;
+const MAX_TOOL_OUTPUT_PARSE_CHARS: usize = 8_192;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ParsedAction {
     pub event_type: String, // "read", "modify", "create", "test_run", "test_result", "llm_call", "command", "search", "tool"
@@ -94,11 +104,61 @@ pub fn simplify_path(path: &str) -> String {
     let clean = path.trim().trim_matches(['"', '\'']);
     let normalized = clean.replace('\\', "/");
     let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
-    if parts.len() <= 3 {
-        return normalized;
+    let simplified = if parts.len() <= 3 {
+        normalized
+    } else {
+        // Return the last two segments (e.g. src/router.ts).
+        parts[parts.len().saturating_sub(2)..].join("/")
+    };
+    sanitize_persisted_text(&simplified, MAX_PATH_CHARS)
+}
+
+/// Last-mile protection for everything copied from an inference request into
+/// telemetry. Bound the work before redaction as well as the final value so a
+/// large request cannot create another large temporary allocation here.
+fn sanitize_persisted_text(input: &str, max_chars: usize) -> String {
+    let scan_limit = max_chars.saturating_mul(4).max(max_chars);
+    let bounded: String = input
+        .chars()
+        .filter(|character| !character.is_control() || matches!(character, '\n' | '\r' | '\t'))
+        .take(scan_limit)
+        .collect();
+    crate::tools::truncate_chars(&crate::tools::redact_secrets(&bounded), max_chars)
+}
+
+fn sanitize_metadata_value(value: &mut Value, depth: usize) {
+    if depth >= 8 {
+        *value = Value::String("[truncated]".to_string());
+        return;
     }
-    // Return last 2 or 3 segments (e.g. src/router.ts or router.ts)
-    parts[parts.len().saturating_sub(2)..].join("/")
+    match value {
+        Value::String(text) => {
+            *text = sanitize_persisted_text(text, MAX_METADATA_VALUE_CHARS);
+        }
+        Value::Array(values) => {
+            values.truncate(MAX_ACTIONS_PER_REQUEST);
+            for value in values {
+                sanitize_metadata_value(value, depth + 1);
+            }
+        }
+        Value::Object(values) => {
+            for value in values.values_mut() {
+                sanitize_metadata_value(value, depth + 1);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn sanitized_metadata_json(metadata: Option<Value>) -> Option<String> {
+    let mut metadata = metadata?;
+    sanitize_metadata_value(&mut metadata, 0);
+    let serialized = serde_json::to_string(&metadata).ok()?;
+    if serialized.chars().count() <= MAX_METADATA_JSON_CHARS {
+        Some(serialized)
+    } else {
+        Some(serde_json::json!({"truncated": true}).to_string())
+    }
 }
 
 /// Parse tool arguments JSON to find common file path fields
@@ -139,7 +199,7 @@ fn extract_command_arg(args: &Value) -> Option<String> {
     for field in ["command", "cmd", "CommandLine", "command_line", "script"] {
         if let Some(val) = args.get(field).and_then(Value::as_str) {
             if !val.trim().is_empty() {
-                return Some(val.trim().to_string());
+                return Some(sanitize_persisted_text(val.trim(), MAX_DETAIL_CHARS));
             }
         }
     }
@@ -163,7 +223,7 @@ fn extract_query_arg(args: &Value) -> Option<String> {
     ] {
         if let Some(val) = args.get(field).and_then(Value::as_str) {
             if !val.trim().is_empty() {
-                return Some(val.trim().to_string());
+                return Some(sanitize_persisted_text(val.trim(), MAX_QUERY_CHARS));
             }
         }
     }
@@ -172,6 +232,7 @@ fn extract_query_arg(args: &Value) -> Option<String> {
 
 /// Parse a tool call by its function name and arguments
 pub fn parse_tool_call(name: &str, args_val: &Value) -> Option<ParsedAction> {
+    let name = sanitize_persisted_text(name, MAX_TOOL_NAME_CHARS);
     let lower_name = name.to_ascii_lowercase();
 
     // 1. File read operations
@@ -255,8 +316,8 @@ pub fn parse_tool_call(name: &str, args_val: &Value) -> Option<ParsedAction> {
                 });
             }
             // General command
-            let short_cmd = if cmd.len() > 36 {
-                format!("{}...", &cmd[..33])
+            let short_cmd = if cmd.chars().count() > 36 {
+                format!("{}...", cmd.chars().take(33).collect::<String>())
             } else {
                 cmd.clone()
             };
@@ -316,13 +377,16 @@ pub fn parse_tool_output(text: &str) -> Option<ParsedAction> {
         return None;
     }
 
-    let lower = text.to_ascii_lowercase();
+    let parse_text = crate::tools::truncate_chars(text, MAX_TOOL_OUTPUT_PARSE_CHARS);
+    let safe_text = sanitize_persisted_text(text, MAX_DETAIL_CHARS);
+
+    let lower = parse_text.to_ascii_lowercase();
 
     // Check for explicit failed counts: e.g. "3 failed", "3 failures", "failed: 3", "3 failed;"
     let mut failed_count = 0usize;
     let mut found_explicit_failure = false;
 
-    let words: Vec<&str> = text.split_whitespace().collect();
+    let words: Vec<&str> = parse_text.split_whitespace().collect();
     for (i, word) in words.iter().enumerate() {
         let clean = word
             .trim_matches(['.', ',', ';', '(', ')', ':', '[', ']'])
@@ -380,8 +444,8 @@ pub fn parse_tool_output(text: &str) -> Option<ParsedAction> {
         return Some(ParsedAction {
             event_type: "test_result".to_string(),
             title: format!("{failed_count} failed"),
-            detail: Some(text.lines().take(3).collect::<Vec<_>>().join(" ")),
-            metadata: Some(serde_json::json!({ "output": text })),
+            detail: Some(safe_text.lines().take(3).collect::<Vec<_>>().join(" ")),
+            metadata: Some(serde_json::json!({ "output": safe_text })),
         });
     }
 
@@ -389,8 +453,8 @@ pub fn parse_tool_output(text: &str) -> Option<ParsedAction> {
         return Some(ParsedAction {
             event_type: "test_result".to_string(),
             title: format!("{passed_str} passed"),
-            detail: Some(text.lines().take(3).collect::<Vec<_>>().join(" ")),
-            metadata: Some(serde_json::json!({ "output": text })),
+            detail: Some(safe_text.lines().take(3).collect::<Vec<_>>().join(" ")),
+            metadata: Some(serde_json::json!({ "output": safe_text })),
         });
     }
 
@@ -401,8 +465,8 @@ pub fn parse_tool_output(text: &str) -> Option<ParsedAction> {
         return Some(ParsedAction {
             event_type: "test_result".to_string(),
             title: "Tests passed".to_string(),
-            detail: Some(text.lines().take(2).collect::<Vec<_>>().join(" ")),
-            metadata: Some(serde_json::json!({ "output": text })),
+            detail: Some(safe_text.lines().take(2).collect::<Vec<_>>().join(" ")),
+            metadata: Some(serde_json::json!({ "output": safe_text })),
         });
     }
 
@@ -410,8 +474,8 @@ pub fn parse_tool_output(text: &str) -> Option<ParsedAction> {
         return Some(ParsedAction {
             event_type: "test_result".to_string(),
             title: "Tests failed".to_string(),
-            detail: Some(text.lines().take(2).collect::<Vec<_>>().join(" ")),
-            metadata: Some(serde_json::json!({ "output": text })),
+            detail: Some(safe_text.lines().take(2).collect::<Vec<_>>().join(" ")),
+            metadata: Some(serde_json::json!({ "output": safe_text })),
         });
     }
 
@@ -425,8 +489,47 @@ pub fn extract_actions_from_request_body(body: &Value) -> Vec<ParsedAction> {
         return actions;
     };
 
-    // We only inspect the most recent few messages to avoid repeating past turns
-    let start_idx = messages.len().saturating_sub(4);
+    let has_tool_call = |message: &Value| {
+        message
+            .get("tool_calls")
+            .and_then(Value::as_array)
+            .is_some_and(|calls| !calls.is_empty())
+            || message
+                .get("content")
+                .and_then(Value::as_array)
+                .is_some_and(|parts| {
+                    parts
+                        .iter()
+                        .any(|part| part.get("type").and_then(Value::as_str) == Some("tool_use"))
+                })
+    };
+
+    // A chat request carries its complete history. Extract only the newest
+    // active tool batch and its following tool results; otherwise every model
+    // turn would persist the same historical actions again. If a later user or
+    // non-tool assistant message exists, that batch is already historical.
+    let Some(start_idx) = messages.iter().rposition(has_tool_call).or_else(|| {
+        messages
+            .last()
+            .is_some_and(|message| {
+                matches!(
+                    message.get("role").and_then(Value::as_str),
+                    Some("tool" | "function")
+                )
+            })
+            .then(|| messages.len().saturating_sub(1))
+    }) else {
+        return actions;
+    };
+    if messages[start_idx + 1..].iter().any(|message| {
+        matches!(
+            message.get("role").and_then(Value::as_str),
+            Some("user" | "assistant")
+        )
+    }) {
+        return actions;
+    }
+
     for message in &messages[start_idx..] {
         // Tool calls in assistant message
         if let Some(tool_calls) = message.get("tool_calls").and_then(Value::as_array) {
@@ -444,6 +547,9 @@ pub fn extract_actions_from_request_body(body: &Value) -> Vec<ParsedAction> {
                 if !name.is_empty() {
                     if let Some(action) = parse_tool_call(name, args) {
                         actions.push(action);
+                        if actions.len() >= MAX_ACTIONS_PER_REQUEST {
+                            return actions;
+                        }
                     }
                 }
             }
@@ -458,6 +564,9 @@ pub fn extract_actions_from_request_body(body: &Value) -> Vec<ParsedAction> {
                     if !name.is_empty() {
                         if let Some(action) = parse_tool_call(name, input) {
                             actions.push(action);
+                            if actions.len() >= MAX_ACTIONS_PER_REQUEST {
+                                return actions;
+                            }
                         }
                     }
                 }
@@ -470,6 +579,9 @@ pub fn extract_actions_from_request_body(body: &Value) -> Vec<ParsedAction> {
             let content = message.get("content").and_then(Value::as_str).unwrap_or("");
             if let Some(action) = parse_tool_output(content) {
                 actions.push(action);
+                if actions.len() >= MAX_ACTIONS_PER_REQUEST {
+                    return actions;
+                }
             }
         }
     }
@@ -522,31 +634,44 @@ pub fn record_request_activity(
         return;
     };
 
-    // Log any extracted actions (avoid duplicates if same title logged recently)
-    for action in extracted {
+    let Ok(transaction) = db.unchecked_transaction() else {
+        return;
+    };
+
+    // Persist the bounded action batch atomically. Sanitization happens again
+    // here as a last line of defense for every current and future parser.
+    for action in extracted.into_iter().take(MAX_ACTIONS_PER_REQUEST) {
         let entry = ActivityEntry {
             id: None,
             timestamp: now.clone(),
-            session_id: session_id.to_string(),
-            event_type: action.event_type,
-            title: action.title,
-            detail: action.detail,
-            metadata_json: action.metadata.map(|m| m.to_string()),
+            session_id: sanitize_persisted_text(session_id, MAX_TOOL_NAME_CHARS),
+            event_type: sanitize_persisted_text(&action.event_type, MAX_TOOL_NAME_CHARS),
+            title: sanitize_persisted_text(&action.title, MAX_TITLE_CHARS),
+            detail: action
+                .detail
+                .map(|detail| sanitize_persisted_text(&detail, MAX_DETAIL_CHARS)),
+            metadata_json: sanitized_metadata_json(action.metadata),
         };
-        let _ = db::log_activity(&db, &entry);
+        if db::log_activity(&transaction, &entry).is_err() {
+            return;
+        }
     }
 
     // Log the LLM call action
     let llm_entry = ActivityEntry {
         id: None,
         timestamp: now,
-        session_id: session_id.to_string(),
-        event_type: llm_action.event_type,
-        title: llm_action.title,
-        detail: llm_action.detail,
-        metadata_json: llm_action.metadata.map(|m| m.to_string()),
+        session_id: sanitize_persisted_text(session_id, MAX_TOOL_NAME_CHARS),
+        event_type: sanitize_persisted_text(&llm_action.event_type, MAX_TOOL_NAME_CHARS),
+        title: sanitize_persisted_text(&llm_action.title, MAX_TITLE_CHARS),
+        detail: llm_action
+            .detail
+            .map(|detail| sanitize_persisted_text(&detail, MAX_DETAIL_CHARS)),
+        metadata_json: sanitized_metadata_json(llm_action.metadata),
     };
-    let _ = db::log_activity(&db, &llm_entry);
+    if db::log_activity(&transaction, &llm_entry).is_ok() {
+        let _ = transaction.commit();
+    }
 }
 
 #[cfg(test)]
@@ -613,7 +738,7 @@ mod tests {
     }
 
     #[test]
-    fn extracts_actions_from_full_chat_body() {
+    fn extracts_only_the_newest_active_tool_batch() {
         let body = json!({
             "messages": [
                 {
@@ -655,10 +780,41 @@ mod tests {
         });
 
         let actions = extract_actions_from_request_body(&body);
-        assert_eq!(actions.len(), 4);
-        assert_eq!(actions[0].title, "Read src/router.ts");
-        assert_eq!(actions[1].title, "Modified src/router.ts");
-        assert_eq!(actions[2].title, "Ran tests");
-        assert_eq!(actions[3].title, "42/42 passed");
+        assert_eq!(actions.len(), 3);
+        assert_eq!(actions[0].title, "Modified src/router.ts");
+        assert_eq!(actions[1].title, "Ran tests");
+        assert_eq!(actions[2].title, "42/42 passed");
+    }
+
+    #[test]
+    fn ignores_completed_historical_tool_batches() {
+        let body = json!({
+            "messages": [
+                {
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "function": {"name": "read_file", "arguments": "{\"path\":\"secret.txt\"}"}
+                    }]
+                },
+                {"role": "tool", "content": "completed"},
+                {"role": "user", "content": "What changed?"}
+            ]
+        });
+
+        assert!(extract_actions_from_request_body(&body).is_empty());
+    }
+
+    #[test]
+    fn persisted_activity_is_unicode_safe_bounded_and_redacted() {
+        let command = format!(
+            "deploy 😀界 with sk-proj-abcdef123456 {}",
+            "x".repeat(MAX_DETAIL_CHARS * 2)
+        );
+        let action = parse_tool_call("run_command", &json!({"command": command})).unwrap();
+        let detail = action.detail.unwrap();
+        assert!(std::str::from_utf8(detail.as_bytes()).is_ok());
+        assert!(detail.chars().count() <= MAX_DETAIL_CHARS);
+        assert!(!detail.contains("sk-proj-abcdef123456"));
+        assert!(detail.contains("[REDACTED]"));
     }
 }

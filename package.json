@@ -19,7 +19,8 @@
   },
   "scripts": {
     "postinstall": "node install.js",
-    "prepack": "node -e \"if(!require('fs').existsSync('./bin/skyport'+(process.platform==='win32'?'.exe':'')))console.warn('[skyport] binary not present — will be downloaded on postinstall')\""
+    "prepack": "node -e \"if(!require('fs').existsSync('./bin/skyport'+(process.platform==='win32'?'.exe':'')))console.warn('[skyport] binary not bundled — it will be downloaded and verified on install')\"",
+    "test": "node --test test/install.test.js"
   },
   "preferGlobal": true,
   "os": ["darwin", "linux", "win32"],

@@ -1,7 +1,8 @@
-const { createWriteStream, existsSync, chmodSync, unlinkSync } = require("fs");
+const { createWriteStream, existsSync, chmodSync, unlinkSync, readFileSync, copyFileSync } = require("fs");
 const { join } = require("path");
 const { get } = require("https");
 const { spawnSync } = require("child_process");
+const { createHash } = require("crypto");
 
 const PKG_VERSION = require("./package.json").version;
 const REPO = "skyhighbg22-jpg/skyport";
@@ -13,7 +14,7 @@ const platformBin = `skyport-${process.platform}-${process.arch}${ext}`;
 const destPlatform = join(__dirname, "bin", platformBin);
 const destGeneric = join(__dirname, "bin", binName);
 
-function platformAsset() {
+function platformAsset(platform = process.platform, arch = process.arch) {
   const map = {
     "win32-x64": `skyport-x86_64-pc-windows-msvc.exe`,
     "darwin-x64": `skyport-x86_64-apple-darwin`,
@@ -21,17 +22,21 @@ function platformAsset() {
     "linux-x64": `skyport-x86_64-unknown-linux-gnu`,
     "linux-arm64": `skyport-aarch64-unknown-linux-gnu`,
   };
-  return map[`${process.platform}-${process.arch}`] || null;
+  return map[`${platform}-${arch}`] || null;
 }
 
-function download(url, dest) {
+function download(url, dest, redirects = 0) {
   return new Promise((resolve, reject) => {
+    if (redirects > 5) {
+      reject(new Error(`Too many redirects for ${url}`));
+      return;
+    }
     const file = createWriteStream(dest);
     get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         file.close();
         try { unlinkSync(dest); } catch {}
-        download(res.headers.location, dest).then(resolve, reject);
+        download(res.headers.location, dest, redirects + 1).then(resolve, reject);
         return;
       }
       if (res.statusCode !== 200) {
@@ -45,6 +50,26 @@ function download(url, dest) {
       file.on("error", reject);
     }).on("error", reject);
   });
+}
+
+function checksumFor(manifest, asset) {
+  const line = String(manifest)
+    .split(/\r?\n/)
+    .find((entry) => {
+      const parts = entry.trim().split(/\s+/);
+      return parts.length >= 2 && parts.at(-1).replace(/^\*/, "") === asset;
+    });
+  const checksum = line?.trim().split(/\s+/)[0]?.toLowerCase();
+  return /^[a-f0-9]{64}$/.test(checksum || "") ? checksum : null;
+}
+
+function verifyChecksum(binaryPath, manifestPath, asset) {
+  const expected = checksumFor(readFileSync(manifestPath, "utf8"), asset);
+  if (!expected) throw new Error(`No SHA-256 checksum published for ${asset}`);
+  const actual = createHash("sha256").update(readFileSync(binaryPath)).digest("hex");
+  if (actual !== expected) {
+    throw new Error(`SHA-256 mismatch for ${asset}`);
+  }
 }
 
 async function main() {
@@ -64,7 +89,7 @@ async function main() {
 
   const asset = platformAsset();
   if (!asset) {
-    console.warn(`[skyport] unsupported platform ${process.platform}-${process.arch}, will try cargo build`);
+    console.warn(`[skyport] unsupported platform ${process.platform}-${process.arch}, checking for a source build`);
     const hasCargo = spawnSync("cargo", ["--version"], { stdio: "ignore" }).status === 0;
     if (hasCargo) {
       console.log("[skyport] building from source with cargo...");
@@ -74,28 +99,37 @@ async function main() {
         return;
       }
     }
-    console.warn(`[skyport] no binary for this platform. Install Rust and run: cargo install skyport`);
-    return;
+    throw new Error(`No Skyport binary is available for ${process.platform}-${process.arch}. Install with: cargo install skyport`);
   }
 
   const url = `${BASE_URL}/${asset}`;
+  const checksumPath = `${destPlatform}.SHA256SUMS`;
   console.log(`[skyport] downloading ${asset} v${PKG_VERSION} ...`);
   try {
     await download(url, destPlatform);
+    await download(`${BASE_URL}/SHA256SUMS`, checksumPath);
+    verifyChecksum(destPlatform, checksumPath, asset);
+    unlinkSync(checksumPath);
     if (process.platform !== "win32") chmodSync(destPlatform, 0o755);
-    try {
-      const { copyFileSync } = require("fs");
-      copyFileSync(destPlatform, destGeneric);
-      if (process.platform !== "win32") chmodSync(destGeneric, 0o755);
-    } catch {}
+    copyFileSync(destPlatform, destGeneric);
+    if (process.platform !== "win32") chmodSync(destGeneric, 0o755);
     console.log(`[skyport] installed to ${destPlatform}`);
   } catch (err) {
     try { unlinkSync(destPlatform); } catch {}
+    try { unlinkSync(checksumPath); } catch {}
     console.warn(`[skyport] download failed: ${err.message}`);
     console.warn(`[skyport] release may not exist yet. Build locally:`);
     console.warn(`[skyport]   cargo install --git https://github.com/${REPO}.git`);
     console.warn(`[skyport] or cargo build --release`);
+    throw err;
   }
 }
 
-main();
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`[skyport] installation failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { checksumFor, platformAsset, verifyChecksum };

@@ -15,6 +15,7 @@ use axum::{
 };
 use clap::{Parser, Subcommand, ValueEnum};
 use rust_embed::RustEmbed;
+use serde::{Deserialize, Serialize};
 use skyport::{
     api::{self, AppState},
     config, db,
@@ -26,6 +27,21 @@ use skyport::{
 #[derive(RustEmbed)]
 #[folder = "static/"]
 struct Assets;
+
+const SERVICE_NAME: &str = "skyport";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct GatewayHealth {
+    service: String,
+    version: String,
+    pid: u32,
+}
+
+#[derive(Clone)]
+struct SecurityGuardState {
+    config: Arc<RwLock<skyport::config::SkyportConfig>>,
+    bound_port: u16,
+}
 
 #[derive(Parser)]
 #[command(name = "skyport", version, about = "Local-first universal AI gateway")]
@@ -227,17 +243,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Some(Command::Serve { no_open, yes }) => serve(no_open, yes).await,
         Some(Command::Ui) => {
-            open::that("http://localhost:5790")?;
+            let cfg = config::load_config()?;
+            let port = locate_gateway(cfg.server.port)
+                .await
+                .map(|(port, _)| port)
+                .unwrap_or(cfg.server.port);
+            open::that(dashboard_url(port))?;
             Ok(())
         }
         Some(Command::Status) => {
-            let online = tokio::net::TcpStream::connect("127.0.0.1:5790")
-                .await
-                .is_ok();
-            println!("skyport: {}", if online { "running" } else { "stopped" });
+            let cfg = config::load_config()?;
+            match locate_gateway(cfg.server.port).await {
+                Some((port, health)) => println!(
+                    "skyport {}: running at {} (pid {})",
+                    health.version,
+                    dashboard_url(port),
+                    health.pid
+                ),
+                None => println!("skyport: stopped"),
+            }
             Ok(())
         }
-        Some(Command::Stop) => stop(),
+        Some(Command::Stop) => stop().await,
         Some(Command::Version) => {
             println!("skyport {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -268,13 +295,15 @@ async fn serve(no_open: bool, yes: bool) -> Result<(), Box<dyn std::error::Error
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => listener,
         Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {
-            if config::read_pid().is_ok() {
+            if let Some(health) = probe_gateway(cfg.server.port).await {
                 println!(
-                    "Skyport is already running at http://localhost:{}",
-                    cfg.server.port
+                    "Skyport {} is already running at {} (pid {})",
+                    health.version,
+                    dashboard_url(cfg.server.port),
+                    health.pid
                 );
                 if !no_open {
-                    let _ = open::that(format!("http://localhost:{}", cfg.server.port));
+                    let _ = open::that(dashboard_url(cfg.server.port));
                 }
                 return Ok(());
             }
@@ -357,13 +386,16 @@ async fn serve(no_open: bool, yes: bool) -> Result<(), Box<dyn std::error::Error
     let app = routes(state.clone())
         .layer(DefaultBodyLimit::max(2 * 1024 * 1024))
         .layer(axum::middleware::from_fn_with_state(
-            state.config.clone(),
+            SecurityGuardState {
+                config: state.config.clone(),
+                bound_port: cfg.server.port,
+            },
             security_guard,
         ));
-    config::write_pid(std::process::id())?;
-    println!("Dashboard: http://localhost:{}", cfg.server.port);
+    config::write_pid(std::process::id(), cfg.server.port)?;
+    println!("Dashboard: {}", dashboard_url(cfg.server.port));
     if !no_open {
-        let _ = open::that(format!("http://localhost:{}", cfg.server.port));
+        let _ = open::that(dashboard_url(cfg.server.port));
     }
     // Discover the model catalog shortly after boot so /v1/models lists real
     // upstream model ids for harnesses that connect to this gateway only.
@@ -427,6 +459,7 @@ async fn serve(no_open: bool, yes: bool) -> Result<(), Box<dyn std::error::Error
 fn routes(state: AppState) -> Router {
     Router::new()
         .route("/", get(index))
+        .route("/healthz", get(health))
         .route("/v1/models", get(api::v1::list_models))
         .route("/v1/chat/completions", post(api::v1::chat_completions))
         .route("/v1/embeddings", post(api::v1::embeddings))
@@ -496,6 +529,55 @@ fn routes(state: AppState) -> Router {
         .with_state(state)
 }
 
+fn dashboard_url(port: u16) -> String {
+    format!("http://localhost:{port}")
+}
+
+fn gateway_health() -> GatewayHealth {
+    GatewayHealth {
+        service: SERVICE_NAME.to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        pid: std::process::id(),
+    }
+}
+
+async fn health() -> axum::Json<GatewayHealth> {
+    axum::Json(gateway_health())
+}
+
+async fn probe_gateway(port: u16) -> Option<GatewayHealth> {
+    let client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_millis(750))
+        .timeout(Duration::from_secs(2))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .ok()?;
+    let response = client
+        .get(format!("http://127.0.0.1:{port}/healthz"))
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?;
+    let health = response.json::<GatewayHealth>().await.ok()?;
+    (health.service == SERVICE_NAME).then_some(health)
+}
+
+async fn locate_gateway(configured_port: u16) -> Option<(u16, GatewayHealth)> {
+    if let Ok(runtime) = config::read_runtime_info() {
+        if let Some(port) = runtime.port {
+            if let Some(health) = probe_gateway(port).await {
+                if health.pid == runtime.pid {
+                    return Some((port, health));
+                }
+            }
+        }
+    }
+    probe_gateway(configured_port)
+        .await
+        .map(|health| (configured_port, health))
+}
+
 async fn index() -> impl IntoResponse {
     let asset = Assets::get("index.html").unwrap();
     (
@@ -517,15 +599,14 @@ async fn index() -> impl IntoResponse {
 }
 
 async fn security_guard(
-    axum::extract::State(config): axum::extract::State<Arc<RwLock<skyport::config::SkyportConfig>>>,
+    axum::extract::State(state): axum::extract::State<SecurityGuardState>,
     request: Request,
     next: Next,
 ) -> Response {
     let path = request.uri().path();
     let protected = path.starts_with("/v1/") || path.starts_with("/api/");
-    let (port, admin_hash, inference_hash) = match config.read() {
+    let (admin_hash, inference_hash) = match state.config.read() {
         Ok(config) => (
-            config.server.port,
             config.server.admin_token_hash.clone(),
             config.server.inference_token_hash.clone(),
         ),
@@ -535,7 +616,7 @@ async fn security_guard(
         .headers()
         .get(header::HOST)
         .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| security::valid_host_header(value, port));
+        .is_some_and(|value| security::valid_host_header(value, state.bound_port));
     if !host_valid {
         return StatusCode::MISDIRECTED_REQUEST.into_response();
     }
@@ -546,7 +627,7 @@ async fn security_guard(
             .headers()
             .get(header::ORIGIN)
             .and_then(|value| value.to_str().ok())
-            .is_some_and(|value| !security::valid_browser_origin(value, port))
+            .is_some_and(|value| !security::valid_browser_origin(value, state.bound_port))
     {
         return StatusCode::FORBIDDEN.into_response();
     }
@@ -741,8 +822,24 @@ fn auth_command(command: AuthCommand) -> Result<(), Box<dyn std::error::Error>> 
     }
     Ok(())
 }
-fn stop() -> Result<(), Box<dyn std::error::Error>> {
-    let pid = config::read_pid()?;
+async fn stop() -> Result<(), Box<dyn std::error::Error>> {
+    let cfg = config::load_config()?;
+    let runtime = config::read_runtime_info()?;
+    let pid = runtime.pid;
+    let port = runtime.port.unwrap_or(cfg.server.port);
+    let health = probe_gateway(port).await.ok_or_else(|| {
+        format!(
+            "No verified Skyport instance is responding at {}; refusing to terminate stale PID {pid}",
+            dashboard_url(port)
+        )
+    })?;
+    if health.pid != pid {
+        return Err(format!(
+            "Skyport PID mismatch (pid file: {pid}, listener: {}); refusing to terminate either process",
+            health.pid
+        )
+        .into());
+    }
     #[cfg(windows)]
     let status = {
         std::process::Command::new("taskkill")
@@ -926,4 +1023,23 @@ fn print_activity_line(entry: &db::ActivityEntry) {
     };
 
     println!("{time_str}  {}{extra}", entry.title);
+}
+
+#[cfg(test)]
+mod main_tests {
+    use super::*;
+
+    #[test]
+    fn dashboard_url_uses_the_configured_port() {
+        assert_eq!(dashboard_url(5790), "http://localhost:5790");
+        assert_eq!(dashboard_url(9142), "http://localhost:9142");
+    }
+
+    #[test]
+    fn health_payload_identifies_this_binary_and_process() {
+        let health = gateway_health();
+        assert_eq!(health.service, SERVICE_NAME);
+        assert_eq!(health.version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(health.pid, std::process::id());
+    }
 }

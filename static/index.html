@@ -26,6 +26,7 @@
       --radius-lg: 24px;
       --radius-md: 16px;
       --radius-sm: 10px;
+      --mobile-rail-height: 59px;
       --display: Bahnschrift, "Arial Narrow", "Segoe UI Variable Display", sans-serif;
       --body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
     }
@@ -280,6 +281,19 @@
     .icon-button svg, .button svg { width: 16px; height: 16px; }
     .icon-button:hover, .button:hover { border-color: var(--line-strong); background: var(--panel-raised); transform: translateY(-1px); }
     .icon-button:disabled, .button:disabled { cursor: wait; opacity: 0.5; transform: none; }
+
+    .nav-button:focus-visible,
+    .icon-button:focus-visible,
+    .button:focus-visible,
+    .segment:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    a:focus-visible,
+    summary:focus-visible {
+      outline: 2px solid var(--acid);
+      outline-offset: 3px;
+    }
 
     .button.primary {
       border-color: var(--acid);
@@ -1102,6 +1116,7 @@
     .switch-track::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; border-radius: 50%; background: var(--muted); transition: transform 160ms ease, background 160ms ease; }
     .switch input:checked + .switch-track { background: var(--acid-soft); border-color: rgba(216, 255, 99, 0.5); }
     .switch input:checked + .switch-track::after { transform: translateX(18px); background: var(--acid); }
+    .switch input:focus-visible + .switch-track { outline: 2px solid var(--acid); outline-offset: 3px; }
 
     .map-list { display: grid; gap: 9px; }
     .map-row { display: grid; grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr) 40px; align-items: center; gap: 10px; }
@@ -1322,7 +1337,7 @@
     .toast::before { content: ""; width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; background: var(--acid); flex: 0 0 auto; }
     .toast.error::before { background: var(--coral); }
     .toast-title { font-size: 12px; font-weight: 700; }
-    .toast-message { color: var(--muted); font-size: 10px; margin-top: 2px; }
+    .toast-message { color: var(--muted); font-size: 10px; margin-top: 2px; overflow-wrap: anywhere; max-height: 8em; overflow: hidden; }
     @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
 
     .skeleton { position: relative; overflow: hidden; background: rgba(255,255,255,0.04); color: transparent !important; border-radius: 5px; }
@@ -1339,15 +1354,17 @@
 
     @media (max-width: 920px) {
       .app-shell { display: block; }
-      .sidebar { position: sticky; width: 100%; height: auto; padding: 11px 16px; border-right: 0; border-bottom: 1px solid var(--line); flex-direction: row; align-items: center; overflow-x: auto; }
+      .sidebar { position: sticky; width: 100%; height: var(--mobile-rail-height); padding: 11px 16px; border-right: 0; border-bottom: 1px solid var(--line); flex-direction: row; align-items: center; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+      .sidebar::-webkit-scrollbar { display: none; }
       .brand { padding: 0 14px 0 0; flex: 0 0 auto; }
       .brand-mark { width: 32px; height: 32px; }
       .brand-kicker, .nav-label, .sidebar-foot, .nav-button .nav-index { display: none; }
       .nav-list { display: flex; gap: 4px; }
       .nav-button { width: auto; min-width: max-content; padding: 9px 11px; font-size: 12px; }
       .nav-button:hover { transform: none; }
-      .topbar { top: 55px; height: 68px; }
+      .topbar { top: var(--mobile-rail-height); height: 68px; }
       .hero-grid, .dashboard-grid, .split-layout, .playground-layout, .session-grid, .skills-layout { grid-template-columns: 1fr; }
+      .playground-chat { order: -1; }
       .skills-filters { position: static; max-height: none; }
       .skill-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .playground-controls { position: static; }
@@ -1360,8 +1377,7 @@
     @media (max-width: 680px) {
       .sidebar { padding-inline: 12px; }
       .brand-name { display: none; }
-      .nav-button span:not(.nav-index) { display: none; }
-      .nav-button { min-width: 40px; justify-content: center; padding-inline: 10px; }
+      .nav-button { min-width: max-content; justify-content: center; padding-inline: 11px; }
       .topbar { padding: 0 17px; }
       .page-title { font-size: 16px; }
       .top-actions .uptime-pill, .top-actions .button-label { display: none; }
@@ -1375,11 +1391,17 @@
       .metric-card { min-height: 126px; padding: 18px; }
       .metric-number { font-size: 29px; }
       .card-grid, .budget-grid { grid-template-columns: 1fr; }
+      .activity-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .skill-card-grid, .skills-toolbar { grid-template-columns: 1fr; }
       .skills-license { align-items: flex-start; flex-direction: column; }
       .skills-license-links { flex-wrap: wrap; }
-      .traffic-stats { grid-template-columns: 1fr; }
+      .traffic-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .field-grid, .field-grid.four, .traffic-filter-grid { grid-template-columns: 1fr; }
+      .section-toolbar > div { width: 100%; max-width: 100%; }
+      .section-toolbar > div:last-child { flex-wrap: wrap; }
+      .segmented { display: flex; width: 100%; max-width: 100%; flex-wrap: wrap; }
+      .segment { flex: 1 1 54px; min-width: 0; }
+      #activity-filter-query { width: 100%; max-width: none !important; }
       .map-row { grid-template-columns: 1fr 34px; }
       .map-row .map-arrow { display: none; }
       .map-row input:nth-of-type(2) { grid-column: 1 / 2; }
@@ -1391,6 +1413,10 @@
       .composer-hint { max-width: 170px; }
       .dialog-actions { flex-direction: column-reverse; }
       .dialog-actions .button { width: 100%; }
+    }
+
+    @media (max-width: 420px) {
+      .traffic-stats { grid-template-columns: 1fr; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1439,16 +1465,16 @@
       </div>
       <div class="nav-label">Navigation</div>
       <nav class="nav-list" aria-label="Primary navigation">
-        <button class="nav-button active" type="button" data-view="overview"><svg><use href="#i-overview"></use></svg><span>Overview</span><span class="nav-index">01</span></button>
-        <button class="nav-button" type="button" data-view="activity"><svg><use href="#i-activity"></use></svg><span>Activity</span><span class="nav-index">02</span></button>
-        <button class="nav-button" type="button" data-view="vault"><svg><use href="#i-key"></use></svg><span>Key vault</span><span class="nav-index">03</span></button>
-        <button class="nav-button" type="button" data-view="providers"><svg><use href="#i-provider"></use></svg><span>Providers</span><span class="nav-index">04</span></button>
-        <button class="nav-button" type="button" data-view="playground"><svg><use href="#i-playground"></use></svg><span>Playground</span><span class="nav-index">05</span></button>
-        <button class="nav-button" type="button" data-view="traffic"><svg><use href="#i-traffic"></use></svg><span>Traffic</span><span class="nav-index">06</span></button>
-        <button class="nav-button" type="button" data-view="routing"><svg><use href="#i-route"></use></svg><span>Routing</span><span class="nav-index">07</span></button>
-        <button class="nav-button" type="button" data-view="budgets"><svg><use href="#i-budget"></use></svg><span>Budgets</span><span class="nav-index">08</span></button>
-        <button class="nav-button" type="button" data-view="tools"><svg><use href="#i-test"></use></svg><span>Tools</span><span class="nav-index">09</span></button>
-        <button class="nav-button" type="button" data-view="skills"><svg><use href="#i-skills"></use></svg><span>Skills</span><span class="nav-index">10</span></button>
+        <button class="nav-button active" type="button" data-view="overview" aria-label="Overview" aria-current="page"><svg aria-hidden="true"><use href="#i-overview"></use></svg><span>Overview</span><span class="nav-index">01</span></button>
+        <button class="nav-button" type="button" data-view="activity" aria-label="Activity"><svg aria-hidden="true"><use href="#i-activity"></use></svg><span>Activity</span><span class="nav-index">02</span></button>
+        <button class="nav-button" type="button" data-view="vault" aria-label="Key vault"><svg aria-hidden="true"><use href="#i-key"></use></svg><span>Key vault</span><span class="nav-index">03</span></button>
+        <button class="nav-button" type="button" data-view="providers" aria-label="Providers"><svg aria-hidden="true"><use href="#i-provider"></use></svg><span>Providers</span><span class="nav-index">04</span></button>
+        <button class="nav-button" type="button" data-view="playground" aria-label="Playground"><svg aria-hidden="true"><use href="#i-playground"></use></svg><span>Playground</span><span class="nav-index">05</span></button>
+        <button class="nav-button" type="button" data-view="traffic" aria-label="Traffic"><svg aria-hidden="true"><use href="#i-traffic"></use></svg><span>Traffic</span><span class="nav-index">06</span></button>
+        <button class="nav-button" type="button" data-view="routing" aria-label="Routing"><svg aria-hidden="true"><use href="#i-route"></use></svg><span>Routing</span><span class="nav-index">07</span></button>
+        <button class="nav-button" type="button" data-view="budgets" aria-label="Budgets"><svg aria-hidden="true"><use href="#i-budget"></use></svg><span>Budgets</span><span class="nav-index">08</span></button>
+        <button class="nav-button" type="button" data-view="tools" aria-label="Tools"><svg aria-hidden="true"><use href="#i-test"></use></svg><span>Tools</span><span class="nav-index">09</span></button>
+        <button class="nav-button" type="button" data-view="skills" aria-label="Skills"><svg aria-hidden="true"><use href="#i-skills"></use></svg><span>Skills</span><span class="nav-index">10</span></button>
       </nav>
       <div class="sidebar-foot">
         <div class="rail-status"><span class="status-dot" id="rail-status-dot"></span><span id="rail-status-text">Connecting</span></div>
@@ -1464,8 +1490,8 @@
         </div>
         <div class="top-actions">
           <div class="uptime-pill" id="uptime">Uptime --</div>
-          <button class="icon-button" id="auth-button" type="button" title="Set dashboard authorization"><svg><use href="#i-lock"></use></svg></button>
-          <button class="button" id="refresh-button" type="button"><svg><use href="#i-refresh"></use></svg><span class="button-label">Refresh</span></button>
+          <button class="icon-button" id="auth-button" type="button" title="Set dashboard authorization" aria-label="Set dashboard authorization"><svg aria-hidden="true"><use href="#i-lock"></use></svg></button>
+          <button class="button" id="refresh-button" type="button" title="Refresh dashboard data" aria-label="Refresh dashboard data"><svg aria-hidden="true"><use href="#i-refresh"></use></svg><span class="button-label">Refresh</span></button>
         </div>
       </header>
 
@@ -1574,19 +1600,19 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
 
           <div class="section-toolbar" style="margin-top:20px;margin-bottom:16px">
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-              <div class="segmented" id="activity-filter-type">
-                <button class="segment active" type="button" data-type="all">All</button>
-                <button class="segment" type="button" data-type="llm_call">→ Model</button>
-                <button class="segment" type="button" data-type="file">Files</button>
-                <button class="segment" type="button" data-type="test">Tests</button>
-                <button class="segment" type="button" data-type="command">Commands</button>
-                <button class="segment" type="button" data-type="tool">Tools</button>
+              <div class="segmented" id="activity-filter-type" role="group" aria-label="Activity type">
+                <button class="segment active" type="button" data-type="all" aria-pressed="true">All</button>
+                <button class="segment" type="button" data-type="llm_call" aria-pressed="false">→ Model</button>
+                <button class="segment" type="button" data-type="file" aria-pressed="false">Files</button>
+                <button class="segment" type="button" data-type="test" aria-pressed="false">Tests</button>
+                <button class="segment" type="button" data-type="command" aria-pressed="false">Commands</button>
+                <button class="segment" type="button" data-type="tool" aria-pressed="false">Tools</button>
               </div>
-              <input id="activity-filter-query" placeholder="Filter activity..." style="max-width:240px;min-height:34px">
+              <input id="activity-filter-query" aria-label="Filter activity" placeholder="Filter activity..." style="max-width:240px;min-height:34px">
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <label class="switch-row-compact" title="Auto-scroll as new activity arrives">
-                <input id="activity-autoscroll-toggle" type="checkbox" checked>
+                <input id="activity-autoscroll-toggle" type="checkbox" aria-label="Auto-scroll activity" checked>
                 <span>Auto-scroll</span>
               </label>
               <button class="button compact" id="copy-session-transcript-btn" type="button" title="Copy transcript"><svg><use href="#i-copy"></use></svg>Copy</button>
@@ -1625,7 +1651,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <span class="badge" id="provider-count-badge">0 configured</span>
               <span class="badge ok" id="catalog-count-badge">0 models in catalog</span>
-              <input id="provider-search" placeholder="Search providers..." style="max-width:220px;min-height:34px">
+              <input id="provider-search" aria-label="Search providers" placeholder="Search providers..." style="max-width:220px;min-height:34px">
             </div>
             <div style="display:flex;gap:8px">
               <button class="button compact" id="refresh-catalog" type="button">Refresh catalog</button>
@@ -1650,17 +1676,17 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
           <article class="panel" style="margin-top:18px">
             <div class="panel-head">
               <div><div class="panel-title">Model catalog</div><div class="panel-subtitle" id="catalog-list-subtitle">Refresh the catalog to browse models</div></div>
-              <div class="segmented" id="catalog-filter">
-                <button class="segment active" type="button" data-catalog-filter="all">All</button>
-                <button class="segment" type="button" data-catalog-filter="free">Free</button>
-                <button class="segment" type="button" data-catalog-filter="paid">Paid</button>
-                <button class="segment" type="button" data-catalog-filter="local">Local</button>
+              <div class="segmented" id="catalog-filter" role="group" aria-label="Catalog tier">
+                <button class="segment active" type="button" data-catalog-filter="all" aria-pressed="true">All</button>
+                <button class="segment" type="button" data-catalog-filter="free" aria-pressed="false">Free</button>
+                <button class="segment" type="button" data-catalog-filter="paid" aria-pressed="false">Paid</button>
+                <button class="segment" type="button" data-catalog-filter="local" aria-pressed="false">Local</button>
               </div>
             </div>
             <div class="panel-body" style="border-bottom:1px solid var(--line)">
               <div class="field-grid">
-                <div class="field"><input id="catalog-search" placeholder="Search model ids..."></div>
-                <div class="field"><select id="catalog-provider-filter"></select></div>
+                <div class="field"><input id="catalog-search" aria-label="Search model IDs" placeholder="Search model ids..."></div>
+                <div class="field"><select id="catalog-provider-filter" aria-label="Filter catalog by provider"></select></div>
               </div>
             </div>
             <div class="data-table-wrap" style="max-height:430px;overflow-y:auto"><table class="data-table"><thead><tr><th>Model</th><th>Provider</th><th>Tier</th></tr></thead><tbody id="catalog-rows"></tbody></table></div>
@@ -1687,7 +1713,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
                 <div class="field" style="margin-top:16px"><div class="range-head"><label for="playground-top-p">Top P</label><span class="range-value" id="top-p-value">1.00</span></div><input id="playground-top-p" type="range" min="0" max="1" step="0.05" value="1"></div>
               </div>
               <div class="form-section">
-                <div class="toggle-row"><div class="toggle-copy"><strong>Stream</strong><span>Render tokens as they arrive</span></div><label class="switch"><input id="playground-stream" type="checkbox"><span class="switch-track"></span></label></div>
+                <div class="toggle-row"><div class="toggle-copy"><strong>Stream</strong><span>Render tokens as they arrive</span></div><label class="switch"><input id="playground-stream" type="checkbox" aria-label="Stream playground responses"><span class="switch-track"></span></label></div>
               </div>
               <div class="form-section">
                 <div class="field"><label for="playground-reasoning">Reasoning effort</label><select id="playground-reasoning"><option value="">default</option><option value="minimal">minimal</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></div>
@@ -1696,7 +1722,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
                 <div class="field"><label for="playground-tool-choice">Tool choice</label><select id="playground-tool-choice"><option value="auto">auto</option><option value="none">none</option><option value="required">required</option></select></div>
               </div>
               <div class="form-section">
-                <div class="toggle-row"><div class="toggle-copy"><strong>Save current settings as default</strong><span>Reuse these controls on reload</span></div><label class="switch"><input id="save-playground-defaults" type="checkbox"><span class="switch-track"></span></label></div>
+                <div class="toggle-row"><div class="toggle-copy"><strong>Save current settings as default</strong><span>Reuse these controls on reload</span></div><label class="switch"><input id="save-playground-defaults" type="checkbox" aria-label="Save playground settings as default"><span class="switch-track"></span></label></div>
               </div>
             </aside>
             <article class="panel playground-chat">
@@ -1713,7 +1739,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
         <section class="view" id="view-traffic" data-title="Traffic logbook" data-index="06">
           <div class="view-heading"><div><div class="eyebrow">Telemetry / request log</div><h1>Traffic</h1></div><p>Inspect model traffic, response status, token volume, cost, and upstream latency across every completed request.</p></div>
           <div class="section-toolbar">
-            <div class="segmented" id="range-selector"><button class="segment" type="button" data-range="1h">1H</button><button class="segment" type="button" data-range="6h">6H</button><button class="segment active" type="button" data-range="24h">24H</button><button class="segment" type="button" data-range="7d">7D</button><button class="segment" type="button" data-range="30d">30D</button><button class="segment" type="button" data-range="90d">90D</button><button class="segment" type="button" data-range="custom">Custom</button></div>
+            <div class="segmented" id="range-selector" role="group" aria-label="Traffic time range"><button class="segment" type="button" data-range="1h" aria-pressed="false">1H</button><button class="segment" type="button" data-range="6h" aria-pressed="false">6H</button><button class="segment active" type="button" data-range="24h" aria-pressed="true">24H</button><button class="segment" type="button" data-range="7d" aria-pressed="false">7D</button><button class="segment" type="button" data-range="30d" aria-pressed="false">30D</button><button class="segment" type="button" data-range="90d" aria-pressed="false">90D</button><button class="segment" type="button" data-range="custom" aria-pressed="false">Custom</button></div>
             <span class="badge ok" id="traffic-filter-badge">Polling live</span>
           </div>
           <article class="panel" style="margin-bottom:18px">
@@ -1736,7 +1762,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
           </article>
           <div class="traffic-stats"><div class="traffic-stat"><strong id="traffic-requests">--</strong><span>Total requests</span></div><div class="traffic-stat"><strong id="traffic-cost">--</strong><span>Estimated cost</span></div><div class="traffic-stat"><strong id="traffic-latency">--</strong><span>Average latency</span></div><div class="traffic-stat"><strong id="traffic-errors">--</strong><span>Failed requests</span></div></div>
           <article class="panel" style="margin-bottom:18px">
-            <div class="panel-head"><div><div class="panel-title" id="traffic-breakdown-title">Model distribution</div><div class="panel-subtitle">Cost, volume, and failures inside the selected filter.</div></div><div class="segmented" id="traffic-group-selector"><button class="segment active" type="button" data-traffic-group="model">Model</button><button class="segment" type="button" data-traffic-group="provider">Provider</button><button class="segment" type="button" data-traffic-group="key">Key</button><button class="segment" type="button" data-traffic-group="status">Status</button><button class="segment" type="button" data-traffic-group="hour">Time</button></div></div>
+            <div class="panel-head"><div><div class="panel-title" id="traffic-breakdown-title">Model distribution</div><div class="panel-subtitle">Cost, volume, and failures inside the selected filter.</div></div><div class="segmented" id="traffic-group-selector" role="group" aria-label="Traffic breakdown"><button class="segment active" type="button" data-traffic-group="model" aria-pressed="true">Model</button><button class="segment" type="button" data-traffic-group="provider" aria-pressed="false">Provider</button><button class="segment" type="button" data-traffic-group="key" aria-pressed="false">Key</button><button class="segment" type="button" data-traffic-group="status" aria-pressed="false">Status</button><button class="segment" type="button" data-traffic-group="hour" aria-pressed="false">Time</button></div></div>
             <div class="panel-body"><div class="provider-bars" id="traffic-breakdown-bars"></div><div class="traffic-series" id="traffic-series"></div></div>
           </article>
           <article class="panel">
@@ -1797,7 +1823,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
                   <div class="field"><label for="tools-provider">Provider</label><select id="tools-provider"></select></div>
                   <div class="field"><label for="tools-model">Model</label><div class="discover-row"><input id="tools-model" list="tools-model-list" autocomplete="off" placeholder="provider/model"><button class="button compact" id="tools-discover" type="button">Discover</button></div><datalist id="tools-model-list"></datalist></div>
                   <div class="field full"><label for="tools-workspace">Workspace</label><input id="tools-workspace" placeholder="C:\path\to\repo (observed read-only)"></div>
-                  <div class="field full"><div class="toggle-row"><div class="toggle-copy"><strong>Allow cloud processing</strong><span>Permit sanitized repository facts and diffs to leave this machine. Local Ollama and LM Studio models do not require consent.</span></div><label class="switch"><input id="tools-allow-cloud" type="checkbox"><span class="switch-track"></span></label></div></div>
+                  <div class="field full"><div class="toggle-row"><div class="toggle-copy"><strong>Allow cloud processing</strong><span>Permit sanitized repository facts and diffs to leave this machine. Local Ollama and LM Studio models do not require consent.</span></div><label class="switch"><input id="tools-allow-cloud" type="checkbox" aria-label="Allow cloud processing"><span class="switch-track"></span></label></div></div>
                 </div>
                 <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="button primary" id="save-tools-config" type="button">Save tool settings</button></div>
               </div>
@@ -1837,7 +1863,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
           <div class="skills-layout">
             <aside class="panel skills-filters" aria-label="Skill filters">
               <div class="panel-head"><div><div class="panel-title">Filters</div><div class="panel-subtitle">Narrow the live catalog</div></div><button class="button compact ghost" id="skill-filter-reset" type="button">Reset</button></div>
-              <div class="skills-filter-section"><div class="skills-filter-title"><span>Status</span></div><div class="segmented" id="skill-status-filter"><button class="segment active" type="button" data-skill-status="all">All</button><button class="segment" type="button" data-skill-status="enabled" title="Active in agent context">Active</button><button class="segment" type="button" data-skill-status="downloaded" title="Downloaded on device">Downloaded</button><button class="segment" type="button" data-skill-status="deactivated" title="On device but deactivated (0 context)">Deactivated</button></div></div>
+              <div class="skills-filter-section"><div class="skills-filter-title"><span>Status</span></div><div class="segmented" id="skill-status-filter" role="group" aria-label="Skill status"><button class="segment active" type="button" data-skill-status="all" aria-pressed="true">All</button><button class="segment" type="button" data-skill-status="enabled" title="Active in agent context" aria-pressed="false">Active</button><button class="segment" type="button" data-skill-status="downloaded" title="Downloaded on device" aria-pressed="false">Downloaded</button><button class="segment" type="button" data-skill-status="deactivated" title="On device but deactivated (0 context)" aria-pressed="false">Deactivated</button></div></div>
               <div class="skills-filter-section"><div class="skills-filter-title"><span>Domain</span></div><div class="skills-filter-list" id="skill-domain-filters"></div></div>
               <div class="skills-filter-section"><div class="skills-filter-title"><span>Product</span><button class="button compact ghost" id="skill-products-toggle" type="button">Show all</button></div><div class="skills-filter-list" id="skill-product-filters"></div></div>
             </aside>
@@ -1852,41 +1878,41 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
     </main>
   </div>
 
-  <dialog id="key-dialog">
+  <dialog id="key-dialog" aria-labelledby="key-dialog-title">
     <form id="key-form">
-      <div class="dialog-head"><div><div class="eyebrow">Encrypted credential</div><h2>Add a key</h2></div><button class="icon-button" type="button" data-close="key-dialog"><svg><use href="#i-close"></use></svg></button></div>
+      <div class="dialog-head"><div><div class="eyebrow">Encrypted credential</div><h2 id="key-dialog-title">Add a key</h2></div><button class="icon-button" type="button" data-close="key-dialog" aria-label="Close add key dialog"><svg aria-hidden="true"><use href="#i-close"></use></svg></button></div>
       <div class="dialog-body"><p class="dialog-copy">The raw credential is encrypted before it is written to disk and will not be shown again.</p><div class="field-grid"><div class="field"><label for="key-provider">Provider</label><select id="key-provider" required></select></div><div class="field"><label for="key-alias">Alias</label><input id="key-alias" required placeholder="primary"></div><div class="field full"><label for="key-secret">API key</label><input id="key-secret" type="password" required autocomplete="off" placeholder="Paste provider key"></div><div class="field"><label for="key-priority">Priority</label><input id="key-priority" type="number" min="0" value="100" required></div></div></div>
       <div class="dialog-actions"><button class="button" type="button" data-close="key-dialog">Cancel</button><button class="button primary" type="submit">Encrypt and add</button></div>
     </form>
   </dialog>
 
-  <dialog id="provider-dialog">
+  <dialog id="provider-dialog" aria-labelledby="provider-dialog-title">
     <form id="provider-form">
-      <div class="dialog-head"><div><div class="eyebrow">Upstream node</div><h2 id="provider-dialog-title">Add provider</h2></div><button class="icon-button" type="button" data-close="provider-dialog"><svg><use href="#i-close"></use></svg></button></div>
-      <div class="dialog-body"><div class="field-grid"><div class="field"><label for="provider-id">Provider ID</label><input id="provider-id" required placeholder="custom"></div><div class="field"><label for="provider-name">Display name</label><input id="provider-name" required placeholder="Custom provider"></div><div class="field full"><label for="provider-url">Base URL</label><input id="provider-url" type="url" required placeholder="https://api.example.com/v1"></div><div class="field full"><label for="provider-format">API format</label><select id="provider-format"><option value="">OpenAI-compatible — OpenAI, DeepSeek, Groq, Mistral, xAI, Together, Cerebras, Ollama, vLLM, LM Studio…</option><option value="anthropic">Anthropic Messages — Claude (api.anthropic.com)</option><option value="gemini">Google Gemini — native generateContent</option><option value="responses">OpenAI Responses — ChatGPT codex and xAI CLI</option></select></div><div class="field"><div class="toggle-row"><div class="toggle-copy"><strong>Enabled</strong><span>Available for routing</span></div><label class="switch"><input id="provider-enabled" type="checkbox" checked><span class="switch-track"></span></label></div></div><div class="field"><div class="toggle-row"><div class="toggle-copy"><strong>Round robin</strong><span>Rotate eligible keys</span></div><label class="switch"><input id="provider-round-robin" type="checkbox"><span class="switch-track"></span></label></div></div></div></div>
+      <div class="dialog-head"><div><div class="eyebrow">Upstream node</div><h2 id="provider-dialog-title">Add provider</h2></div><button class="icon-button" type="button" data-close="provider-dialog" aria-label="Close provider dialog"><svg aria-hidden="true"><use href="#i-close"></use></svg></button></div>
+      <div class="dialog-body"><div class="field-grid"><div class="field"><label for="provider-id">Provider ID</label><input id="provider-id" required placeholder="custom"></div><div class="field"><label for="provider-name">Display name</label><input id="provider-name" required placeholder="Custom provider"></div><div class="field full"><label for="provider-url">Base URL</label><input id="provider-url" type="url" required placeholder="https://api.example.com/v1"></div><div class="field full"><label for="provider-format">API format</label><select id="provider-format"><option value="">OpenAI-compatible — OpenAI, DeepSeek, Groq, Mistral, xAI, Together, Cerebras, Ollama, vLLM, LM Studio…</option><option value="anthropic">Anthropic Messages — Claude (api.anthropic.com)</option><option value="gemini">Google Gemini — native generateContent</option><option value="responses">OpenAI Responses — ChatGPT codex and xAI CLI</option></select></div><div class="field"><div class="toggle-row"><div class="toggle-copy"><strong>Enabled</strong><span>Available for routing</span></div><label class="switch"><input id="provider-enabled" type="checkbox" aria-label="Enable provider" checked><span class="switch-track"></span></label></div></div><div class="field"><div class="toggle-row"><div class="toggle-copy"><strong>Round robin</strong><span>Rotate eligible keys</span></div><label class="switch"><input id="provider-round-robin" type="checkbox" aria-label="Use round-robin key selection"><span class="switch-track"></span></label></div></div></div></div>
       <div class="dialog-actions"><button class="button" type="button" data-close="provider-dialog">Cancel</button><button class="button primary" type="submit">Save provider</button></div>
     </form>
   </dialog>
 
-  <dialog id="auth-sub-dialog">
+  <dialog id="auth-sub-dialog" aria-labelledby="auth-sub-title">
     <form id="auth-sub-form">
-      <div class="dialog-head"><div><div class="eyebrow">Account subscription</div><h2 id="auth-sub-title">Sign in</h2></div><button class="icon-button" type="button" data-close="auth-sub-dialog"><svg><use href="#i-close"></use></svg></button></div>
+      <div class="dialog-head"><div><div class="eyebrow">Account subscription</div><h2 id="auth-sub-title">Sign in</h2></div><button class="icon-button" type="button" data-close="auth-sub-dialog" aria-label="Close sign-in dialog"><svg aria-hidden="true"><use href="#i-close"></use></svg></button></div>
       <div class="dialog-body" id="auth-sub-body"></div>
       <div class="dialog-actions"><button class="button" type="button" data-close="auth-sub-dialog">Close</button><button class="button primary" id="auth-sub-submit" type="submit" hidden>Save key</button></div>
     </form>
   </dialog>
 
-  <dialog id="budget-dialog">
+  <dialog id="budget-dialog" aria-labelledby="budget-dialog-title">
     <form id="budget-form">
-      <div class="dialog-head"><div><div class="eyebrow">Spend & Rate Guardrail</div><h2 id="budget-dialog-title">Add guardrail</h2></div><button class="icon-button" type="button" data-close="budget-dialog"><svg><use href="#i-close"></use></svg></button></div>
+      <div class="dialog-head"><div><div class="eyebrow">Spend & Rate Guardrail</div><h2 id="budget-dialog-title">Add guardrail</h2></div><button class="icon-button" type="button" data-close="budget-dialog" aria-label="Close budget dialog"><svg aria-hidden="true"><use href="#i-close"></use></svg></button></div>
       <div class="dialog-body"><div class="field-grid"><div class="field full"><label for="budget-scope">Scope</label><input id="budget-scope" required placeholder="openai or openai:primary"></div><div class="field"><label for="budget-daily">Daily cap USD</label><input id="budget-daily" type="number" min="0" step="0.01" placeholder="No cap"></div><div class="field"><label for="budget-monthly">Monthly cap USD</label><input id="budget-monthly" type="number" min="0" step="0.01" placeholder="No cap"></div><div class="field full"><label for="budget-rpm">Max Requests/Min (RPM)</label><input id="budget-rpm" type="number" min="1" step="1" placeholder="Unlimited"></div></div></div>
       <div class="dialog-actions"><button class="button" type="button" data-close="budget-dialog">Cancel</button><button class="button primary" type="submit">Save guardrail</button></div>
     </form>
   </dialog>
 
-  <dialog id="rate-limit-dialog">
+  <dialog id="rate-limit-dialog" aria-labelledby="rate-limit-dialog-title">
     <form id="rate-limit-form">
-      <div class="dialog-head"><div><div class="eyebrow">Global Traffic Control</div><h2>Global Rate Limits</h2></div><button class="icon-button" type="button" data-close="rate-limit-dialog"><svg><use href="#i-close"></use></svg></button></div>
+      <div class="dialog-head"><div><div class="eyebrow">Global Traffic Control</div><h2 id="rate-limit-dialog-title">Global Rate Limits</h2></div><button class="icon-button" type="button" data-close="rate-limit-dialog" aria-label="Close rate limits dialog"><svg aria-hidden="true"><use href="#i-close"></use></svg></button></div>
       <div class="dialog-body">
         <p class="dialog-copy">Limit overall request velocity across all providers and models to protect accounts against quota spikes.</p>
         <div class="field-grid">
@@ -1898,17 +1924,17 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
     </form>
   </dialog>
 
-  <dialog id="auth-dialog">
+  <dialog id="auth-dialog" aria-labelledby="dashboard-auth-title">
     <form id="auth-form">
-      <div class="dialog-head"><div><div class="eyebrow">Dashboard access</div><h2>Authorize control plane</h2></div><button class="icon-button" type="button" data-close="auth-dialog"><svg><use href="#i-close"></use></svg></button></div>
+      <div class="dialog-head"><div><div class="eyebrow">Dashboard access</div><h2 id="dashboard-auth-title">Authorize control plane</h2></div><button class="icon-button" type="button" data-close="auth-dialog" aria-label="Close authorization dialog"><svg aria-hidden="true"><use href="#i-close"></use></svg></button></div>
       <div class="dialog-body"><p class="dialog-copy">Enter the admin token from <code>skyport auth show admin</code>. It remains only in page memory and is cleared on reload.</p><div class="field"><label for="dashboard-auth">Admin bearer token</label><input id="dashboard-auth" type="password" autocomplete="off" placeholder="Skyport admin token"></div></div>
       <div class="dialog-actions"><button class="button danger" id="clear-session-auth" type="button">Clear stored token</button><button class="button primary" type="submit">Authorize</button></div>
     </form>
   </dialog>
 
-  <dialog id="custom-skill-dialog">
+  <dialog id="custom-skill-dialog" aria-labelledby="custom-skill-dialog-title">
     <form id="custom-skill-form">
-      <div class="dialog-head"><div><div class="eyebrow">Universal harness capability</div><h2>Import Custom Skill</h2></div><button class="icon-button" type="button" data-close="custom-skill-dialog"><svg><use href="#i-close"></use></svg></button></div>
+      <div class="dialog-head"><div><div class="eyebrow">Universal harness capability</div><h2 id="custom-skill-dialog-title">Import Custom Skill</h2></div><button class="icon-button" type="button" data-close="custom-skill-dialog" aria-label="Close custom skill dialog"><svg aria-hidden="true"><use href="#i-close"></use></svg></button></div>
       <div class="dialog-body">
         <p class="dialog-copy">Install custom skills from GitHub repositories, packages, or URLs globally across all 70+ supported harnesses.</p>
         <div class="field-grid">
@@ -1969,6 +1995,26 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
   <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
   <script>
+    function readStoredObject(storage, key) {
+      try {
+        const parsed = JSON.parse(storage.getItem(key) || "{}");
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch {
+        try { storage.removeItem(key); } catch { /* storage can be unavailable */ }
+        return {};
+      }
+    }
+
+    function persistTrafficFilters() {
+      try {
+        if (Object.keys(state.trafficFilters || {}).length) {
+          sessionStorage.setItem("skyportTrafficFilters", JSON.stringify(state.trafficFilters));
+        } else {
+          sessionStorage.removeItem("skyportTrafficFilters");
+        }
+      } catch { /* filtering still works when storage is unavailable */ }
+    }
+
     const state = {
       status: null,
       keys: [],
@@ -1984,7 +2030,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       logTotal: 0,
       traffic: null,
       trafficGroupBy: "model",
-      trafficFilters: JSON.parse(sessionStorage.getItem("skyportTrafficFilters") || "{}"),
+      trafficFilters: readStoredObject(sessionStorage, "skyportTrafficFilters"),
       statusFetchedAt: 0,
       configDirty: false,
       testResults: {},
@@ -1992,6 +2038,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       playgroundModels: {},
       playgroundBusy: false,
       refreshing: false,
+      pollingLive: false,
       sessionStartedAt: Date.now(),
       activityLogs: [],
       sessionAggregates: null,
@@ -2071,6 +2118,16 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
         .replaceAll("'", "&#039;");
     }
 
+    function safeExternalUrl(value) {
+      try {
+        const url = new URL(String(value || ""), location.origin);
+        const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+        return url.protocol === "https:" || (url.protocol === "http:" && loopback) ? url.href : null;
+      } catch {
+        return null;
+      }
+    }
+
     function formatNumber(value) {
       const number = Number(value || 0);
       if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(1)}M`;
@@ -2100,9 +2157,19 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       return `${minutes}m ${total % 60}s`;
     }
 
-    function errorMessage(error) {
-      if (typeof error === "string") return error;
-      return error?.message || error?.error?.message || error?.error || "Unexpected request failure";
+    function cleanErrorText(value) {
+      if (typeof value !== "string") return "";
+      const text = value.replace(/\s+/g, " ").trim();
+      if (!text || /<(?:!doctype|html|head|body)\b/i.test(text)) return "";
+      return text.length > 240 ? `${text.slice(0, 237)}…` : text;
+    }
+
+    function errorMessage(error, fallback = "Unexpected request failure") {
+      if (error?.name === "AbortError") return "Request timed out";
+      const candidate = typeof error === "string"
+        ? error
+        : error?.error?.message || error?.message || (typeof error?.error === "string" ? error.error : "");
+      return cleanErrorText(candidate) || fallback;
     }
 
     function toast(title, message = "", type = "success") {
@@ -2128,40 +2195,70 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
     }
 
     async function api(path, options = {}) {
-      const headers = new Headers(options.headers || {});
+      const { timeoutMs = 20_000, signal: externalSignal, ...fetchOptions } = options;
+      const headers = new Headers(fetchOptions.headers || {});
       headers.set("Accept", "application/json");
-      if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+      if (fetchOptions.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
       const authToken = getAuthToken();
       if (authToken) headers.set("Authorization", `Bearer ${authToken}`);
 
-      const response = await fetch(path, { ...options, headers });
-      const text = await response.text();
-      let payload = null;
-      if (text) {
-        try { payload = JSON.parse(text); } catch { payload = text; }
-      }
+      const controller = new AbortController();
+      const abortFromExternal = () => controller.abort();
+      externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
+      const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
+      try {
+        const response = await fetch(path, { ...fetchOptions, headers, signal: controller.signal });
+        const text = await response.text();
+        let payload = null;
+        if (text) {
+          try { payload = JSON.parse(text); } catch { payload = text; }
+        }
 
-      if (response.status === 401) {
-        openDialog("auth-dialog");
-        throw new Error("Authorization required");
-      }
+        if (response.status === 401) {
+          openDialog("auth-dialog");
+          throw new Error("Authorization required");
+        }
 
-      if (!response.ok || (payload && payload.ok === false)) {
-        throw new Error(errorMessage(payload) || `Request failed with ${response.status}`);
+        if (!response.ok || (payload && payload.ok === false)) {
+          throw new Error(errorMessage(payload, `Request failed (HTTP ${response.status})`));
+        }
+        return payload;
+      } catch (error) {
+        if (error?.name === "AbortError") throw new Error("Request timed out");
+        throw error;
+      } finally {
+        if (timer) clearTimeout(timer);
+        externalSignal?.removeEventListener("abort", abortFromExternal);
       }
-      return payload;
     }
 
     function setView(viewName, updateHash = true) {
       const name = pageNames[viewName] ? viewName : "overview";
       $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${name}`));
-      $$(".nav-button").forEach((button) => button.classList.toggle("active", button.dataset.view === name));
+      $$(".nav-button").forEach((button) => {
+        const active = button.dataset.view === name;
+        button.classList.toggle("active", active);
+        if (active) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+      });
       const current = $(`#view-${name}`);
       $("#page-title").textContent = current.dataset.title;
       $("#page-eyebrow").textContent = `Command / ${current.dataset.index}`;
+      document.title = `${current.dataset.title} · Skyport`;
       if (updateHash) history.replaceState(null, "", name === "overview" ? location.pathname : `#${name}`);
       window.scrollTo({ top: 0, behavior: "smooth" });
+      if (updateHash && window.matchMedia("(max-width: 920px)").matches) {
+        $(`.nav-button[data-view="${name}"]`)?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+      }
       if (name === "skills") loadSkills();
+    }
+
+    function setSegmentSelection(buttons, selected) {
+      buttons.forEach((button) => {
+        const active = selected(button);
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
     }
 
     function rangeMilliseconds(range) {
@@ -2219,44 +2316,48 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
     }
 
     async function refreshAll({ quiet = false } = {}) {
-      if (state.refreshing) return;
+      if (state.refreshing) return false;
       state.refreshing = true;
       const refreshButton = $("#refresh-button");
       refreshButton.disabled = true;
-      const configRequest = state.configDirty && state.config ? Promise.resolve(state.config) : api("/api/config");
-      const paths = [
-        api("/api/status"),
-        api("/api/keys"),
-        api("/api/providers"),
-        api("/api/budgets"),
-        configRequest,
-        api(`/api/logs?${trafficParams(true)}`),
-        api(`/api/stats?range=${state.range}`),
-        api("/v1/models"),
-        api("/api/models/catalog"),
-        api("/api/auth"),
-        api(`/api/traffic?${trafficParams(false)}`),
-        api("/api/activity?limit=300")
-      ];
+      try {
+        const configRequest = state.configDirty && state.config ? Promise.resolve(state.config) : api("/api/config");
+        const paths = [
+          api("/api/status"),
+          api("/api/keys"),
+          api("/api/providers"),
+          api("/api/budgets"),
+          configRequest,
+          api(`/api/logs?${trafficParams(true)}`),
+          api(`/api/stats?range=${state.range}`),
+          api("/v1/models"),
+          api("/api/models/catalog"),
+          api("/api/auth"),
+          api(`/api/traffic?${trafficParams(false)}`),
+          api("/api/activity?limit=300")
+        ];
 
-      const results = await Promise.allSettled(paths);
-      const targets = ["status", "keys", "providers", "budgets", "config", "logs", "stats", "models", "catalogModels", "auth", "traffic", "sessionActivities"];
-      let failure = null;
-      results.forEach((result, index) => {
-        if (result.status === "fulfilled") {
-          if (targets[index] === "logs") applyLogResponse(result.value);
-          else if (targets[index] === "sessionActivities") state.sessionActivities = Array.isArray(result.value) ? result.value : (result.value.activities || []);
-          else state[targets[index]] = result.value;
-          if (targets[index] === "status") state.statusFetchedAt = Date.now();
-        } else if (!failure) {
-          failure = result.reason;
-        }
-      });
+        const results = await Promise.allSettled(paths);
+        const targets = ["status", "keys", "providers", "budgets", "config", "logs", "stats", "models", "catalogModels", "auth", "traffic", "sessionActivities"];
+        let failure = null;
+        results.forEach((result, index) => {
+          if (result.status === "fulfilled") {
+            if (targets[index] === "logs") applyLogResponse(result.value);
+            else if (targets[index] === "sessionActivities") state.sessionActivities = Array.isArray(result.value) ? result.value : (result.value.activities || []);
+            else state[targets[index]] = result.value;
+            if (targets[index] === "status") state.statusFetchedAt = Date.now();
+          } else if (!failure) {
+            failure = result.reason;
+          }
+        });
 
-      renderAll();
-      if (failure && !quiet && errorMessage(failure) !== "Authorization required") toast("Refresh incomplete", errorMessage(failure), "error");
-      state.refreshing = false;
-      refreshButton.disabled = false;
+        renderAll();
+        if (failure && !quiet && errorMessage(failure) !== "Authorization required") toast("Refresh incomplete", errorMessage(failure), "error");
+        return !failure;
+      } finally {
+        state.refreshing = false;
+        refreshButton.disabled = false;
+      }
     }
 
     function renderAll() {
@@ -2551,7 +2652,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
               </div>
             </div>
             <label class="switch" title="${escapeHtml(switchTitle)}">
-              <input type="checkbox" data-skill-toggle="${escapeHtml(skill.name)}" ${skill.enabled ? "checked" : ""} ${busy || (unavailable && !skill.enabled && !isDownloaded) ? "disabled" : ""}>
+              <input type="checkbox" data-skill-toggle="${escapeHtml(skill.name)}" aria-label="Enable ${escapeHtml(skill.name)}" ${skill.enabled ? "checked" : ""} ${busy || (unavailable && !skill.enabled && !isDownloaded) ? "disabled" : ""}>
               <span class="switch-track"></span>
             </label>
           </div>
@@ -2741,7 +2842,8 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
     }
 
     async function pollLive() {
-      if (document.hidden) return;
+      if (document.hidden || state.pollingLive || state.refreshing) return;
+      state.pollingLive = true;
       try {
         const [status, recent, sessionLogs, actRes] = await Promise.all([
           api("/api/status"),
@@ -2766,6 +2868,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
         renderActivity();
         renderSessionActivity();
       } catch { /* the live poller stays quiet; the full refresh reports errors */ }
+      finally { state.pollingLive = false; }
     }
 
     function renderOverview() {
@@ -2910,7 +3013,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
         const keyCount = (state.keys || []).filter((key) => key.provider === id).length;
         const result = state.testResults[id];
         return `<article class="entity-card compact ${config.enabled ? "" : "disabled"}" data-index="${String(index + 1).padStart(2, "0")}">
-          <div class="entity-head"><div class="entity-symbol">${providerSymbol(id)}</div><label class="switch" title="Toggle provider"><input type="checkbox" data-provider-toggle="${escapeHtml(id)}" ${config.enabled ? "checked" : ""}><span class="switch-track"></span></label></div>
+          <div class="entity-head"><div class="entity-symbol">${providerSymbol(id)}</div><label class="switch" title="Toggle provider"><input type="checkbox" data-provider-toggle="${escapeHtml(id)}" aria-label="Enable ${escapeHtml(config.name || id)}" ${config.enabled ? "checked" : ""}><span class="switch-track"></span></label></div>
           <div class="entity-title">${escapeHtml(config.name || id)}</div><div class="entity-id">${escapeHtml(id)} / ${keyCount} key${keyCount === 1 ? "" : "s"}${config.round_robin ? " / round robin" : ""}${config.format && config.format !== "openai" ? ` / ${escapeHtml(config.format)}` : ""}</div>
           <span class="entity-url" title="${escapeHtml(config.base_url)}">${escapeHtml(config.base_url)}</span>
           <div class="entity-actions"><button class="button compact" type="button" data-provider-test="${escapeHtml(id)}">${icon("test")} Test</button><button class="button compact" type="button" data-open-provider="${escapeHtml(id)}">${icon("edit")} Edit</button>${result ? `<span class="badge ${result.ok ? "ok" : "bad"}">${escapeHtml(result.label)}</span>` : ""}</div>
@@ -2948,7 +3051,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
           <div class="entity-actions">${p.linked
             ? `<button class="button compact" type="button" data-auth-disconnect="${escapeHtml(p.provider_id)}">Disconnect</button>`
             : p.flow === "unavailable"
-              ? `<a class="button compact" href="${escapeHtml(p.verify_url || "#")}" target="_blank" rel="noopener">Get a key</a>`
+              ? `<a class="button compact" href="${escapeHtml(safeExternalUrl(p.verify_url) || "#")}" target="_blank" rel="noopener">Get a key</a>`
               : `<button class="button compact" type="button" data-auth-connect="${escapeHtml(p.provider_id)}">Sign in</button>`}
           </div>
         </article>`;
@@ -3014,20 +3117,30 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       const submit = $("#auth-sub-submit");
       const body = $("#auth-sub-body");
       if (result.mode === "device") {
+        const verificationUrl = safeExternalUrl(result.verification_uri);
+        if (!verificationUrl) {
+          toast("Sign-in blocked", "The provider returned an unsafe verification URL", "error");
+          return;
+        }
         submit.hidden = true;
         body.innerHTML = `<div class="field-grid">
           <div class="field full"><p class="dialog-copy">${escapeHtml(result.help)}</p></div>
-          <div class="field full"><div class="panel" style="padding:18px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>1. Open the verification page</span><a class="button compact" href="${escapeHtml(result.verification_uri)}" target="_blank" rel="noopener">Open page</a></div><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px"><span>2. Enter this code</span><span class="query-code" title="Copy code">${escapeHtml(result.user_code)}</span></div></div></div>
+          <div class="field full"><div class="panel" style="padding:18px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>1. Open the verification page</span><a class="button compact" href="${escapeHtml(verificationUrl)}" target="_blank" rel="noopener">Open page</a></div><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px"><span>2. Enter this code</span><span class="query-code" title="Copy code">${escapeHtml(result.user_code)}</span></div></div></div>
           <div class="field full"><div class="auth-status" id="auth-status">Waiting for approval…</div></div>
         </div>`;
       } else if (result.mode === "browser") {
+        const authorizeUrl = safeExternalUrl(result.authorize_url);
+        if (!authorizeUrl) {
+          toast("Sign-in blocked", "The provider returned an unsafe authorization URL", "error");
+          return;
+        }
         submit.hidden = true;
         body.innerHTML = `<div class="field-grid">
           <div class="field full"><p class="dialog-copy">${escapeHtml(result.help)}</p></div>
-          <div class="field full"><div class="panel" style="padding:18px;text-align:center">A browser tab should open. If it did not, <a class="button compact" href="${escapeHtml(result.authorize_url)}" target="_blank" rel="noopener">continue in browser</a>.</div></div>
+          <div class="field full"><div class="panel" style="padding:18px;text-align:center">A browser tab should open. If it did not, <a class="button compact" href="${escapeHtml(authorizeUrl)}" target="_blank" rel="noopener">continue in browser</a>.</div></div>
           <div class="field full"><div class="auth-status" id="auth-status">Waiting for approval…</div></div>
         </div>`;
-        window.open(result.authorize_url, "_blank");
+        window.open(authorizeUrl, "_blank", "noopener");
       } else if (result.mode === "paste") {
         stopAuthPolling();
         submit.hidden = false;
@@ -3040,7 +3153,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       } else if (result.mode === "unavailable") {
         stopAuthPolling();
         submit.hidden = true;
-        body.innerHTML = `<div class="field-grid"><div class="field full"><p class="dialog-copy">${escapeHtml(result.help)}</p></div><div class="field full" style="text-align:center"><a class="button compact" href="${escapeHtml(result.verify_url || "#")}" target="_blank" rel="noopener">Get a key</a></div></div>`;
+        body.innerHTML = `<div class="field-grid"><div class="field full"><p class="dialog-copy">${escapeHtml(result.help)}</p></div><div class="field full" style="text-align:center"><a class="button compact" href="${escapeHtml(safeExternalUrl(result.verify_url) || "#")}" target="_blank" rel="noopener">Get a key</a></div></div>`;
       } else {
         stopAuthPolling();
         submit.hidden = true;
@@ -3230,7 +3343,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       if (!field) return;
       state.trafficFilters = { ...state.trafficFilters, [field]: value };
       state.logOffset = 0;
-      sessionStorage.setItem("skyportTrafficFilters", JSON.stringify(state.trafficFilters));
+      persistTrafficFilters();
       try {
         const [stats] = await Promise.all([api(`/api/stats?range=${state.range}`), loadTraffic()]);
         state.stats = stats;
@@ -3256,11 +3369,9 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       const filtered = Object.values(state.trafficFilters || {}).some((value) => String(value || "").trim());
       $("#traffic-filter-badge").textContent = filtered ? "Filters active" : "Polling live";
       $("#traffic-filter-badge").className = `badge ${filtered ? "warn" : "ok"}`;
-      $$("#range-selector .segment").forEach((button) => {
-        const custom = Boolean(state.trafficFilters.from || state.trafficFilters.to);
-        button.classList.toggle("active", button.dataset.range === "custom" ? custom : !custom && button.dataset.range === state.range);
-      });
-      $$("#traffic-group-selector .segment").forEach((button) => button.classList.toggle("active", button.dataset.trafficGroup === state.trafficGroupBy));
+      const custom = Boolean(state.trafficFilters.from || state.trafficFilters.to);
+      setSegmentSelection($$("#range-selector .segment"), (button) => button.dataset.range === "custom" ? custom : !custom && button.dataset.range === state.range);
+      setSegmentSelection($$("#traffic-group-selector .segment"), (button) => button.dataset.trafficGroup === state.trafficGroupBy);
       const labels = { model: "Model distribution", provider: "Provider distribution", key: "Credential distribution", status: "Status distribution", hour: "Traffic over time" };
       $("#traffic-breakdown-title").textContent = labels[state.trafficGroupBy] || "Traffic distribution";
       const breakdown = traffic.breakdown || [];
@@ -3310,11 +3421,17 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       const summaryParts = [];
       if (rl.max_rpm) summaryParts.push(`${rl.max_rpm} req/min (RPM)`);
       if (rl.max_rps) summaryParts.push(`${rl.max_rps} req/sec burst (RPS)`);
-      const summaryText = summaryParts.length
-        ? `Active global caps: <strong>${summaryParts.join(" · ")}</strong> across all models & providers`
-        : "Unlimited throughput (no global RPM / RPS cap configured)";
       const el = $("#global-rate-limit-summary");
-      if (el) el.innerHTML = summaryText;
+      if (el) {
+        el.replaceChildren();
+        if (summaryParts.length) {
+          const strong = document.createElement("strong");
+          strong.textContent = summaryParts.join(" · ");
+          el.append("Active global caps: ", strong, " across all models & providers");
+        } else {
+          el.textContent = "Unlimited throughput (no global RPM / RPS cap configured)";
+        }
+      }
 
       $("#budget-grid").innerHTML = budgets.length ? budgets.map(([scope, budget]) => `<article class="budget-card">
         <div class="budget-card-head"><div><div class="budget-scope">${escapeHtml(scope)}</div><div class="budget-type">${scope.includes(":") ? "Credential scope" : "Provider scope"}</div></div><div style="display:flex;gap:6px"><button class="icon-button" type="button" data-open-budget="${escapeHtml(scope)}" title="Edit budget">${icon("edit")}</button><button class="icon-button" type="button" data-budget-remove="${escapeHtml(scope)}" title="Remove budget">${icon("trash")}</button></div></div>
@@ -3843,15 +3960,27 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
 
     $("#auth-form").addEventListener("submit", async (event) => {
       event.preventDefault();
-      const token = $("#dashboard-auth").value;
-      if (token) authToken = token;
-      $("#dashboard-auth").value = "";
-      closeDialog("auth-dialog");
+      const input = $("#dashboard-auth");
+      const token = input.value.trim();
+      if (!token) {
+        toast("Token required", "Enter the admin token shown by the Skyport CLI", "error");
+        input.focus();
+        return;
+      }
+      const previousToken = authToken;
+      authToken = token;
       try {
-        await refreshAll();
+        await api("/api/status", { timeoutMs: 5_000 });
+        input.value = "";
+        closeDialog("auth-dialog");
+        await refreshAll({ quiet: true });
         if ($("#view-skills").classList.contains("active")) loadSkills(true);
         toast("Dashboard authorized", "Token retained in page memory only");
-      } catch (error) { toast("Authorization failed", errorMessage(error), "error"); }
+      } catch (error) {
+        authToken = previousToken;
+        input.select();
+        toast("Authorization failed", errorMessage(error), "error");
+      }
     });
 
     $("#clear-session-auth").addEventListener("click", () => {
@@ -3900,7 +4029,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       const button = event.target.closest("[data-skill-status]");
       if (!button) return;
       state.skillFilters.status = button.dataset.skillStatus;
-      $$("#skill-status-filter .segment").forEach((segment) => segment.classList.toggle("active", segment === button));
+      setSegmentSelection($$("#skill-status-filter .segment"), (segment) => segment === button);
       renderSkills();
     });
 
@@ -3908,7 +4037,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       state.skillFilters = { status: "all", categories: [], products: [], query: "", sort: "name" };
       $("#skill-search").value = "";
       $("#skill-sort").value = "name";
-      $$("#skill-status-filter .segment").forEach((segment) => segment.classList.toggle("active", segment.dataset.skillStatus === "all"));
+      setSegmentSelection($$("#skill-status-filter .segment"), (segment) => segment.dataset.skillStatus === "all");
       renderSkills();
     });
 
@@ -4022,7 +4151,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       const segment = event.target.closest("[data-catalog-filter]");
       if (!segment) return;
       state.catalogFilter.tier = segment.dataset.catalogFilter;
-      $$("#catalog-filter .segment").forEach((button) => button.classList.toggle("active", button === segment));
+      setSegmentSelection($$("#catalog-filter .segment"), (button) => button === segment);
       renderCatalog();
     });
 
@@ -4138,7 +4267,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       const btn = event.target.closest("[data-type]");
       if (!btn) return;
       state.activityFilterType = btn.dataset.type;
-      $$("#activity-filter-type .segment").forEach((s) => s.classList.toggle("active", s === btn));
+      setSegmentSelection($$("#activity-filter-type .segment"), (segment) => segment === btn);
       renderSessionActivity();
     });
 
@@ -4194,7 +4323,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       if (!button || button.dataset.range === "custom" || button.dataset.range === state.range) return;
       state.range = button.dataset.range;
       state.trafficFilters = { ...state.trafficFilters, from: "", to: "" };
-      sessionStorage.setItem("skyportTrafficFilters", JSON.stringify(state.trafficFilters));
+      persistTrafficFilters();
       try {
         const [stats] = await Promise.all([api(`/api/stats?range=${state.range}`), loadTraffic()]);
         state.stats = stats;
@@ -4220,7 +4349,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
         maxTokens: $("#traffic-max-tokens").value
       };
       state.logOffset = 0;
-      sessionStorage.setItem("skyportTrafficFilters", JSON.stringify(state.trafficFilters));
+      persistTrafficFilters();
       try { await loadTraffic(); renderTraffic(); } catch (error) { toast("Could not filter traffic", errorMessage(error), "error"); }
     });
 
@@ -4228,7 +4357,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       state.range = "24h";
       state.logOffset = 0;
       state.trafficFilters = {};
-      sessionStorage.removeItem("skyportTrafficFilters");
+      persistTrafficFilters();
       try {
         const [stats] = await Promise.all([api("/api/stats?range=24h"), loadTraffic()]);
         state.stats = stats;
@@ -4263,11 +4392,10 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
 
     window.addEventListener("hashchange", () => setView(location.hash.slice(1) || "overview", false));
     setInterval(tickClock, 1000);
-    setInterval(pollLive, 5000);
-    pollLive();
+    setInterval(pollLive, 10_000);
     setInterval(() => {
       if (!document.hidden && !$$('dialog[open]').length) refreshAll({ quiet: true });
-    }, 15000);
+    }, 60_000);
 
     setView(location.hash.slice(1) || "overview", false);
     refreshAll().then(() => {
