@@ -2,7 +2,7 @@
 
 Local-first proxy and control plane that sits between your tools and AI providers. Telemetry, cost tracking, and global skills — all on `127.0.0.1`.
 
-![version](https://img.shields.io/badge/version-0.1.1-blue) ![license](https://img.shields.io/badge/license-MIT-green)
+![version](https://img.shields.io/badge/version-0.1.2-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## Features
 
