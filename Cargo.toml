@@ -1,6 +1,6 @@
 [package]
 name = "skyport"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Local-first universal AI gateway/runtime — OpenAI-compatible proxy, cost tracking, and skills on 127.0.0.1"
 license = "MIT"
@@ -51,7 +51,7 @@ keyring = { version = "3", default-features = false, features = ["windows-native
 keyring = { version = "3", default-features = false, features = ["apple-native"] }
 
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
-keyring = { version = "3", default-features = false, features = ["sync-secret-service"] }
+keyring = { version = "3", default-features = false, features = ["sync-secret-service", "vendored"] }
 
 [dev-dependencies]
 tempfile = "3"

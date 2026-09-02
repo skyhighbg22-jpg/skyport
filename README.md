@@ -2,7 +2,7 @@
 
 Local-first proxy and control plane that sits between your tools and AI providers. Telemetry, cost tracking, and global skills — all on `127.0.0.1`.
 
-![version](https://img.shields.io/badge/version-0.1.0-blue) ![license](https://img.shields.io/badge/license-MIT-green)
+![version](https://img.shields.io/badge/version-0.1.1-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## Features
 
@@ -16,43 +16,38 @@ Local-first proxy and control plane that sits between your tools and AI provider
 
 ## Install
 
-**npm / yarn / pnpm / bun**
-```bash
-npm install -g skyport
-# or
-yarn global add skyport
-pnpm add -g skyport
-bun add -g skyport
-npx skyport serve
-```
+Prebuilt binaries are available from [GitHub Releases](https://github.com/skyhighbg22-jpg/skyport/releases). The installers download the correct binary for your machine and verify its SHA-256 checksum.
 
-**cargo (Rust)**
-```bash
-cargo install skyport
-cargo install --git https://github.com/skyhighbg22-jpg/skyport.git
-```
+**macOS / Linux**
 
-**Homebrew**
-```bash
-brew tap skyhighbg22-jpg/skyport
-brew install skyport
-```
-
-**One-liner (macOS / Linux)**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/skyhighbg22-jpg/skyport/main/install.sh | sh
 ```
 
-**One-liner (Windows PowerShell)**
+**Windows PowerShell**
+
 ```powershell
 irm https://raw.githubusercontent.com/skyhighbg22-jpg/skyport/main/install.ps1 | iex
 ```
 
+No Rust toolchain is needed for either installer.
+
 **From source**
+
+Requires Rust 1.86 or newer, a C/C++ build toolchain, and Perl (used to compile
+the vendored OpenSSL dependency). Linux builds bundle the D-Bus client library,
+so distribution-specific `libdbus` development packages are not required.
+
 ```bash
 git clone https://github.com/skyhighbg22-jpg/skyport.git
 cd skyport
-cargo build --release
+cargo build --locked --release
+```
+
+You can also install directly from Git:
+
+```bash
+cargo install --locked --git https://github.com/skyhighbg22-jpg/skyport.git
 ```
 
 ## Quick start
