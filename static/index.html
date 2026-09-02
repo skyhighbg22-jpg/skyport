@@ -803,7 +803,7 @@
     .playground-message.error .message-avatar { color: var(--coral); }
     .message-body { display: flex; flex-direction: column; min-width: 0; }
     .message-label { color: var(--muted); font-size: 9px; letter-spacing: 0.12em; margin-bottom: 6px; text-transform: uppercase; }
-    .message-bubble { border: 1px solid var(--line); border-radius: 4px 15px 15px 15px; background: var(--ink-soft); padding: 13px 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .message-bubble { border: 1px solid var(--line); border-radius: 4px 15px 15px 15px; background: var(--ink-soft); padding: 13px 15px; overflow-wrap: anywhere; line-height: 1.6; font-size: 13px; }
     .playground-message.user .message-bubble { border-radius: 15px 4px 15px 15px; background: var(--acid-soft); border-color: rgba(216, 255, 99, 0.2); }
     .playground-message.error .message-bubble { color: var(--coral); border-color: rgba(255, 113, 86, 0.25); background: rgba(255, 113, 86, 0.06); }
     .message-stats { color: var(--muted); display: flex; gap: 12px; font-size: 9px; margin-top: 6px; }
@@ -1422,7 +1422,31 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
     }
+    .message-bubble :first-child { margin-top: 0; } .message-bubble :last-child { margin-bottom: 0; }
+    .message-bubble h1,.message-bubble h2,.message-bubble h3,.message-bubble h4 { font-family: var(--display); font-weight: 650; letter-spacing: -0.02em; line-height: 1.25; margin: 14px 0 8px; }
+    .message-bubble h1 { font-size: 20px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    .message-bubble h2 { font-size: 17px; color: var(--acid); }
+    .message-bubble h3 { font-size: 14px; }
+    .message-bubble h4 { font-size: 13px; color: var(--mint); }
+    .message-bubble p { margin: 8px 0; }
+    .message-bubble a { color: var(--mint); text-decoration: underline; text-underline-offset: 2px; }
+    .message-bubble ul,.message-bubble ol { margin: 8px 0; padding-left: 22px; }
+    .message-bubble li { margin: 3px 0; }
+    .message-bubble li::marker { color: var(--acid); }
+    .message-bubble blockquote { margin: 10px 0; padding: 8px 12px; border-left: 3px solid var(--acid); background: rgba(216,255,99,0.06); border-radius: 0 8px 8px 0; color: var(--muted); }
+    .message-bubble hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+    .message-bubble code { font-family: ui-monospace, "Cascadia Code", monospace; font-size: 12px; background: rgba(255,255,255,0.07); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+    .message-bubble pre { margin: 10px 0; background: #0a1411; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; position: relative; }
+    .message-bubble pre code { display: block; background: transparent; border: 0; padding: 12px 14px; overflow-x: auto; white-space: pre; font-size: 12px; line-height: 1.55; }
+    .message-bubble pre .code-copy { position: absolute; top: 7px; right: 7px; font-size: 10px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; }
+    .message-bubble table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+    .message-bubble th,.message-bubble td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+    .message-bubble th { background: var(--panel-raised); color: var(--acid); font-weight: 650; }
+    .message-bubble .math-display { margin: 12px 0; padding: 10px; background: rgba(103,230,202,0.06); border: 1px solid rgba(103,230,202,0.13); border-radius: 8px; overflow-x: auto; text-align: center; }
+    .message-bubble .math-inline { color: var(--mint); }
+    .message-bubble .katex { font-size: 1.05em; }
   </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -2116,6 +2140,82 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+    }
+    function renderMath(expr, display) {
+      const s = String(expr || "").trim();
+      if (!s) return "";
+      try {
+        if (window.katex) return window.katex.renderToString(s, { displayMode: display, throwOnError: false, strict: false });
+      } catch {}
+      return `<code>${escapeHtml(s)}</code>`;
+    }
+    function renderMarkdown(src) {
+      if (!src) return "";
+      let t = src.replace(/\r\n/g, "\n");
+      const slots = [];
+      const save = (html) => { const k = `@@__SLOT_${slots.length}__@@`; slots.push(html); return k; };
+      t = t.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => save(`<pre><code class="language-${escapeHtml((lang||'').trim())}">${escapeHtml(code)}</code><button class="code-copy" type="button" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent).then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1200)})">Copy</button></pre>`));
+      t = t.replace(/\$\$([\s\S]*?)\$\$/g, (_, m) => save(`<div class="math-display">${renderMath(m, true)}</div>`));
+      t = t.replace(/\\\[([\s\S]*?)\\\]/g, (_, m) => save(`<div class="math-display">${renderMath(m, true)}</div>`));
+      t = t.replace(/(?<!\\)\$(?!\$)([^\$\n]+?)(?<!\\)\$(?!\$)/g, (_, m) => save(`<span class="math-inline">${renderMath(m, false)}</span>`));
+      t = t.replace(/\\\(([\s\S]*?)\\\)/g, (_, m) => save(`<span class="math-inline">${renderMath(m, false)}</span>`));
+      t = t.replace(/`([^`\n]+?)`/g, (_, c) => save(`<code>${escapeHtml(c)}</code>`));
+      t = escapeHtml(t);
+      t = t.replace(/^######\s+(.+)$/gm, "<h4>$1</h4>");
+      t = t.replace(/^#####\s+(.+)$/gm, "<h4>$1</h4>");
+      t = t.replace(/^####\s+(.+)$/gm, "<h4>$1</h4>");
+      t = t.replace(/^###\s+(.+)$/gm, "<h3>$1</h3>");
+      t = t.replace(/^##\s+(.+)$/gm, "<h2>$1</h2>");
+      t = t.replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
+      t = t.replace(/^&gt;\s?(.+)$/gm, "<blockquote>$1</blockquote>");
+      t = t.replace(/^\s*[-*_]{3,}\s*$/gm, "<hr>");
+      t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      t = t.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, '<img src="$2" alt="$1" loading="lazy" style="max-width:100%;border-radius:8px">');
+      t = t.replace(/\*\*\*([^\n]+?)\*\*\*/g, "<strong><em>$1</em></strong>");
+      t = t.replace(/\*\*([^\n]+?)\*\*/g, "<strong>$1</strong>");
+      t = t.replace(/__([^\n]+?)__/g, "<strong>$1</strong>");
+      t = t.replace(/\b~~([^\n]+?)~~/g, "<del>$1</del>");
+      t = t.replace(/(?<!\*)\*([^\n*]+?)\*(?!\*)/g, "<em>$1</em>");
+      t = t.replace(/(?<!_)_\b([^\n_]+?)_\b/g, "<em>$1</em>");
+      const lines = t.split("\n");
+      let out = "", inUl = false, inOl = false, inTable = false, tableBuf = [];
+      const flushLists = () => { if (inUl) { out += "</ul>"; inUl = false; } if (inOl) { out += "</ol>"; inOl = false; } };
+      const flushTable = () => {
+        if (!inTable || !tableBuf.length) return;
+        const rows = tableBuf.map(r => r.split("|").map(c=>c.trim()).filter(c=>c!==""));
+        const isSep = (r) => r.every(c => /^:?-+:?$/.test(c));
+        let html = '<table>';
+        let start = 0;
+        if (rows.length > 1 && isSep(rows[1])) {
+          html += "<thead><tr>" + rows[0].map(c=>`<th>${c}</th>`).join("") + "</tr></thead><tbody>";
+          start = 2;
+        } else html += "<tbody>";
+        for (let i = start; i < rows.length; i++) html += "<tr>" + rows[i].map(c=>`<td>${c}</td>`).join("") + "</tr>";
+        html += "</tbody></table>";
+        out += html; tableBuf = []; inTable = false;
+      };
+      for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        const l = raw.trim();
+        if (!l) { flushLists(); flushTable(); continue; }
+        if (l.startsWith("@@__SLOT_")) { flushLists(); flushTable(); out += l; continue; }
+        if (l.startsWith("<h") || l.startsWith("<blockquote") || l.startsWith("<hr") || l.startsWith("<pre") || l.startsWith("<div class=\"math")) { flushLists(); flushTable(); out += l; continue; }
+        if (/^\|.*\|$/.test(l)) { flushLists(); inTable = true; tableBuf.push(l.slice(1,-1)); continue; }
+        if (inTable) flushTable();
+        const ulm = l.match(/^[-*+]\s+(.+)/);
+        const olm = l.match(/^\d+\.\s+(.+)/);
+        if (ulm) { if (inOl) { out += "</ol>"; inOl = false; } if (!inUl) { out += "<ul>"; inUl = true; } out += `<li>${ulm[1]}</li>`; continue; }
+        if (olm) { if (inUl) { out += "</ul>"; inUl = false; } if (!inOl) { out += "<ol>"; inOl = true; } out += `<li>${olm[1]}</li>`; continue; }
+        flushLists();
+        if (l.startsWith("<a ") || l.startsWith("<img")) out += `<p>${l}</p>`;
+        else out += `<p>${l}</p>`;
+      }
+      flushLists(); flushTable();
+      let html = out || `<p>${t}</p>`;
+      for (let i = 0; i < slots.length; i++) html = html.split(`@@__SLOT_${i}__@@`).join(slots[i]);
+      html = html.replace(/<blockquote>([\s\S]*?)<\/blockquote>/g, (m, c) => `<blockquote>${c.replace(/<\/blockquote>\s*<blockquote>/g,"<br>")}</blockquote>`);
+      html = html.replace(/<p>\s*<\/p>/g,"");
+      return html;
     }
 
     function safeExternalUrl(value) {
@@ -3232,7 +3332,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
           : "";
         const bubbleBody = message.streaming && !message.content && !message.reasoning
           ? `<span class="thinking-dots"><span></span><span></span><span></span></span>`
-          : escapeHtml(message.content);
+          : isUser || isError ? `<div style="white-space:pre-wrap">${escapeHtml(message.content)}</div>` : renderMarkdown(message.content);
         return `<div class="playground-message ${isUser ? "user" : isError ? "error" : "assistant"}">
           <div class="message-avatar">${isUser ? "YOU" : isError ? "!" : providerSymbol(message.provider || provider)}</div>
           <div class="message-body"><div class="message-label">${isUser ? "You" : isError ? "Request failed" : escapeHtml(state.providers[message.provider]?.name || message.provider || "Assistant")}</div>${reasoning}<div class="message-bubble">${bubbleBody}</div>${stats}</div>
@@ -3803,7 +3903,7 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
             placeholder.content = partial.content;
             placeholder.reasoning = partial.reasoning;
             const now = performance.now();
-            if (now - lastRender > 120) { lastRender = now; renderPlayground(); }
+            if (now - lastRender > 32) { lastRender = now; requestAnimationFrame(renderPlayground); }
           });
           const finalContent = typeof result.content === "string" ? result.content : extractAssistantContent(result);
           const finalReasoning = typeof result.reasoning === "string" ? result.reasoning : extractReasoning(result);
@@ -4403,5 +4503,6 @@ OPENAI_API_KEY=&lt;skyport auth show inference&gt;</pre>
       renderPlayground();
     });
   </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 </body>
 </html>
