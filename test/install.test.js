@@ -11,8 +11,14 @@ test("maps every published target to its release asset", () => {
   assert.equal(platformAsset("win32", "x64"), "skyport-x86_64-pc-windows-msvc.exe");
   assert.equal(platformAsset("darwin", "x64"), "skyport-x86_64-apple-darwin");
   assert.equal(platformAsset("darwin", "arm64"), "skyport-aarch64-apple-darwin");
-  assert.equal(platformAsset("linux", "x64"), "skyport-x86_64-unknown-linux-gnu");
-  assert.equal(platformAsset("linux", "arm64"), "skyport-aarch64-unknown-linux-gnu");
+  assert.equal(platformAsset("linux", "x64", {}), "skyport-x86_64-unknown-linux-gnu");
+  assert.equal(platformAsset("linux", "arm64", {}), "skyport-aarch64-unknown-linux-gnu");
+  assert.equal(platformAsset("android", "arm64"), "skyport-aarch64-linux-android");
+  assert.equal(
+    platformAsset("linux", "arm64", { ANDROID_ROOT: "/system" }),
+    "skyport-aarch64-linux-android",
+  );
+  assert.equal(platformAsset("android", "x64"), null);
   assert.equal(platformAsset("win32", "arm64"), null);
 });
 

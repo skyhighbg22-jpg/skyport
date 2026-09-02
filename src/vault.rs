@@ -15,7 +15,6 @@ const ENVELOPE_VERSION: u8 = 1;
 const ENVELOPE_AAD: &[u8] = b"skyport/vault/envelope/v1";
 const LEGACY_AAD: &[u8] = b"";
 const AES_GCM_NONCE_LEN: usize = 12;
-const KEYRING_SERVICE: &str = "skyport";
 const CURRENT_KEYRING_ACCOUNT: &str = "master_key";
 const PREVIOUS_KEYRING_ACCOUNT: &str = "master_key_previous";
 type EnvelopeFingerprint = [u8; 32];
@@ -340,48 +339,28 @@ impl StoredKey {
     }
 }
 
-fn keyring_access_error() -> Box<dyn std::error::Error> {
-    "Failed to access vault keyring".into()
-}
-
-fn keyring_entry(account: &str) -> Result<keyring::Entry, Box<dyn std::error::Error>> {
-    keyring::Entry::new(KEYRING_SERVICE, account).map_err(|_| keyring_access_error())
-}
-
-fn read_keyring_key(account: &str) -> Result<StoredKey, Box<dyn std::error::Error>> {
-    let entry = keyring_entry(account)?;
-    match entry.get_password() {
-        Ok(password) => {
-            let password = Zeroizing::new(password);
-            let mut key = Zeroizing::new(Vec::with_capacity(32));
-            if BASE64.decode_vec(password.as_bytes(), &mut key).is_err() || key.len() != 32 {
-                return Ok(StoredKey::Invalid);
-            }
-            Ok(StoredKey::Present(key))
-        }
-        Err(keyring::Error::NoEntry) => Ok(StoredKey::Missing),
-        Err(keyring::Error::BadEncoding(mut bytes)) => {
-            bytes.zeroize();
-            Ok(StoredKey::Invalid)
-        }
-        Err(_) => Err(keyring_access_error()),
+fn read_stored_key(account: &str) -> Result<StoredKey, Box<dyn std::error::Error>> {
+    let Some(password) = crate::credential_store::read(account)
+        .map_err(|_| "Failed to access vault credential store")?
+    else {
+        return Ok(StoredKey::Missing);
+    };
+    let mut key = Zeroizing::new(Vec::with_capacity(32));
+    if BASE64.decode_vec(password.as_bytes(), &mut key).is_err() || key.len() != 32 {
+        return Ok(StoredKey::Invalid);
     }
+    Ok(StoredKey::Present(key))
 }
 
-fn set_keyring_key(account: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    let entry = keyring_entry(account)?;
+fn set_stored_key(account: &str, key: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let encoded = Zeroizing::new(BASE64.encode(key));
-    entry
-        .set_password(encoded.as_str())
-        .map_err(|_| keyring_access_error())
+    crate::credential_store::write(account, encoded.as_str())
+        .map_err(|_| "Failed to access vault credential store".into())
 }
 
-fn delete_keyring_key(account: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let entry = keyring_entry(account)?;
-    match entry.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(_) => Err(keyring_access_error()),
-    }
+fn delete_stored_key(account: &str) -> Result<(), Box<dyn std::error::Error>> {
+    crate::credential_store::delete(account)
+        .map_err(|_| "Failed to access vault credential store".into())
 }
 
 fn generate_master_key() -> Zeroizing<Vec<u8>> {
@@ -392,14 +371,14 @@ fn generate_master_key() -> Zeroizing<Vec<u8>> {
 }
 
 fn get_or_create_master_key() -> Result<Zeroizing<Vec<u8>>, Box<dyn std::error::Error>> {
-    match read_keyring_key(CURRENT_KEYRING_ACCOUNT)? {
+    match read_stored_key(CURRENT_KEYRING_ACCOUNT)? {
         StoredKey::Present(key) => Ok(key),
         StoredKey::Missing => {
             let key = generate_master_key();
-            set_keyring_key(CURRENT_KEYRING_ACCOUNT, &key)?;
+            set_stored_key(CURRENT_KEYRING_ACCOUNT, &key)?;
             Ok(key)
         }
-        StoredKey::Invalid => Err("Master key in keyring is invalid".into()),
+        StoredKey::Invalid => Err("Master key in credential store is invalid".into()),
     }
 }
 
@@ -516,15 +495,15 @@ type LoadedVault = (Vec<VaultEntry>, Zeroizing<Vec<u8>>);
 fn decrypt_existing_vault(
     encrypted: &EncryptedVault,
 ) -> Result<LoadedVault, Box<dyn std::error::Error>> {
-    let current = read_keyring_key(CURRENT_KEYRING_ACCOUNT)?;
+    let current = read_stored_key(CURRENT_KEYRING_ACCOUNT)?;
     if let Some(current_key) = current.as_bytes() {
         if let Ok(entries) = decrypt_entries(encrypted, current_key) {
-            delete_keyring_key(PREVIOUS_KEYRING_ACCOUNT)?;
+            delete_stored_key(PREVIOUS_KEYRING_ACCOUNT)?;
             return Ok((entries, Zeroizing::new(current_key.to_vec())));
         }
     }
 
-    let previous = read_keyring_key(PREVIOUS_KEYRING_ACCOUNT)?;
+    let previous = read_stored_key(PREVIOUS_KEYRING_ACCOUNT)?;
     let (entries, selection) = decrypt_with_key_selection(encrypted, None, previous.as_bytes())
         .map_err(|_| -> Box<dyn std::error::Error> {
             "Vault could not be decrypted or recovered".into()
@@ -536,8 +515,8 @@ fn decrypt_existing_vault(
         .ok_or("Vault could not be decrypted or recovered")?;
     // Restoring current before deleting previous keeps at least one usable
     // key through every interruption point.
-    set_keyring_key(CURRENT_KEYRING_ACCOUNT, recovered_key)?;
-    delete_keyring_key(PREVIOUS_KEYRING_ACCOUNT)?;
+    set_stored_key(CURRENT_KEYRING_ACCOUNT, recovered_key)?;
+    delete_stored_key(PREVIOUS_KEYRING_ACCOUNT)?;
     Ok((entries, Zeroizing::new(recovered_key.to_vec())))
 }
 
@@ -772,7 +751,7 @@ impl Vault {
             let master_key = get_or_create_master_key()?;
             let entries = Vec::new();
             let fingerprint = persist_entries(&path, &entries, &master_key)?;
-            delete_keyring_key(PREVIOUS_KEYRING_ACCOUNT)?;
+            delete_stored_key(PREVIOUS_KEYRING_ACCOUNT)?;
             (entries, master_key, fingerprint)
         };
 
@@ -820,8 +799,8 @@ impl Vault {
 
         // The previous key must be durable before current is changed. From
         // here until cleanup, either current or previous decrypts either file.
-        set_keyring_key(PREVIOUS_KEYRING_ACCOUNT, &active_key)?;
-        set_keyring_key(CURRENT_KEYRING_ACCOUNT, &new_key)?;
+        set_stored_key(PREVIOUS_KEYRING_ACCOUNT, &active_key)?;
+        set_stored_key(CURRENT_KEYRING_ACCOUNT, &new_key)?;
         if atomic_write(&path, &replacement_json).is_err() {
             return Err(
                 "Master-key rotation did not complete; recovery will run on next load".into(),
@@ -839,7 +818,7 @@ impl Vault {
         }
         #[cfg(test)]
         let _ = replacement_fingerprint;
-        delete_keyring_key(PREVIOUS_KEYRING_ACCOUNT)?;
+        delete_stored_key(PREVIOUS_KEYRING_ACCOUNT)?;
         Ok(())
     }
 

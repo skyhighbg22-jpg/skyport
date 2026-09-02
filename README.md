@@ -2,13 +2,13 @@
 
 Local-first proxy and control plane that sits between your tools and AI providers. Telemetry, cost tracking, and global skills — all on `127.0.0.1`.
 
-![version](https://img.shields.io/badge/version-0.1.3-blue) ![license](https://img.shields.io/badge/license-MIT-green)
+![version](https://img.shields.io/badge/version-0.1.4-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## Features
 
 - **Universal proxy** — OpenAI-compatible `/v1/*` for any provider (OpenAI, Anthropic, Gemini, Groq, DeepSeek, Ollama, LM Studio, …)
-- **Secure by default** — Loopback-only, separate `admin` + `inference` 256-bit tokens in OS keyring, SHA-256 verifiers on disk
-- **Encrypted vault** — Provider keys & OAuth tokens in AES-256-GCM `vault.json`, master key in keyring
+- **Secure by default** — Loopback-only, separate `admin` + `inference` 256-bit tokens in platform-secure storage, SHA-256 verifiers on disk
+- **Encrypted vault** — Provider keys & OAuth tokens in AES-256-GCM `vault.json`, master key stored separately
 - **Telemetry** — Token counts, latency, cost, and request log in SQLCipher-encrypted SQLite
 - **Skills** — One-click enable/disable of all 341 official [NVIDIA/skills](https://github.com/NVIDIA/skills) + custom `npx skills` packages, installed globally for every supported agent
 - **Web dashboard** — Single-file `static/index.html` embedded in the binary
@@ -18,7 +18,7 @@ Local-first proxy and control plane that sits between your tools and AI provider
 
 Prebuilt binaries are available from [GitHub Releases](https://github.com/skyhighbg22-jpg/skyport/releases). The installers download the correct binary for your machine and verify its SHA-256 checksum.
 
-**macOS / Linux**
+**macOS / Linux / Android (Termux ARM64)**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/skyhighbg22-jpg/skyport/main/install.sh | sh
@@ -32,11 +32,17 @@ irm https://raw.githubusercontent.com/skyhighbg22-jpg/skyport/main/install.ps1 |
 
 No Rust toolchain is needed for either installer.
 
+Android is a distinct ABI, not ordinary glibc Linux. The installer detects
+Termux and downloads the native `aarch64-linux-android` release; do not run the
+`aarch64-unknown-linux-gnu` asset on Android.
+
 **From source**
 
 Requires Rust 1.86 or newer, a C/C++ build toolchain, and Perl (used to compile
-the vendored OpenSSL dependency). Linux builds bundle the D-Bus client library,
-so distribution-specific `libdbus` development packages are not required.
+the vendored OpenSSL dependency). Desktop Linux builds bundle the D-Bus client
+library, so distribution-specific `libdbus` development packages are not
+required. In Termux, install the native Rust and build tools first with
+`pkg install rust clang make perl pkg-config`.
 
 ```bash
 git clone https://github.com/skyhighbg22-jpg/skyport.git

@@ -36,6 +36,19 @@ jobs:
           test "$cargo_version" = "$expected" || { echo "Cargo.toml is $cargo_version, expected $expected"; exit 1; }
           test "$npm_version" = "$expected" || { echo "package.json is $npm_version, expected $expected"; exit 1; }
 
+      - name: Test installer platform detection
+        shell: sh
+        run: |
+          export SKYPORT_INSTALL_LIB_ONLY=1
+          . ./install.sh
+          unset ANDROID_ROOT ANDROID_DATA
+          test "$(platform_target Linux x86_64 GNU/Linux)" = "x86_64-unknown-linux-gnu"
+          ANDROID_ROOT=/system
+          export ANDROID_ROOT
+          test "$(platform_target Linux aarch64 GNU/Linux)" = "aarch64-linux-android"
+          unset ANDROID_ROOT
+          test "$(platform_target Linux arm64 Android)" = "aarch64-linux-android"
+
   build:
     needs: validate
     name: build ${{ matrix.target }}
@@ -50,6 +63,9 @@ jobs:
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             asset: skyport-aarch64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-linux-android
+            asset: skyport-aarch64-linux-android
           - os: macos-latest
             target: x86_64-apple-darwin
             asset: skyport-x86_64-apple-darwin
@@ -94,11 +110,40 @@ jobs:
             export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
             export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
           fi
+          if [ "${{ matrix.target }}" = "aarch64-linux-android" ]; then
+            test -n "${ANDROID_NDK_LATEST_HOME:-}" || {
+              echo "ANDROID_NDK_LATEST_HOME is not available on this runner"
+              exit 1
+            }
+            toolchain="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+            linker="$toolchain/aarch64-linux-android24-clang"
+            test -x "$linker"
+            export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$linker"
+            export CC_aarch64_linux_android="$linker"
+            export CXX_aarch64_linux_android="$toolchain/aarch64-linux-android24-clang++"
+            export AR_aarch64_linux_android="$toolchain/llvm-ar"
+            export RANLIB_aarch64_linux_android="$toolchain/llvm-ranlib"
+          fi
           cargo build --locked --release --target ${{ matrix.target }}
 
       - name: Strip (unix)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.target != 'aarch64-linux-android'
         run: strip target/${{ matrix.target }}/release/skyport || true
+
+      - name: Verify Android ABI
+        if: matrix.target == 'aarch64-linux-android'
+        shell: bash
+        run: |
+          binary="target/${{ matrix.target }}/release/skyport"
+          headers="$(readelf -lW "$binary")"
+          printf '%s\n' "$headers"
+          grep -Fq '[Requesting program interpreter: /system/bin/linker64]' <<<"$headers"
+          tls_alignment="$(awk '$1 == "TLS" { print $NF; exit }' <<<"$headers")"
+          if [ -n "$tls_alignment" ] && (( tls_alignment < 64 )); then
+            echo "Android ARM64 TLS alignment is $tls_alignment; expected at least 0x40"
+            exit 1
+          fi
+          echo "Verified Android ARM64 interpreter and TLS alignment (${tls_alignment:-no PT_TLS segment})."
 
       - name: Prepare asset
         shell: bash
@@ -118,6 +163,7 @@ jobs:
           path: dist/${{ matrix.asset }}
 
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     steps:

@@ -2,8 +2,11 @@
 
 Skyport binds to loopback and requires authentication for every `/api` and
 `/v1` request. The control plane and inference API use separate 256-bit tokens.
-Raw tokens are stored in the operating-system keyring; `config.toml` contains
-only SHA-256 verifiers.
+Raw tokens are stored in platform-secure credential storage; `config.toml`
+contains only SHA-256 verifiers. Windows, macOS, and desktop Linux use their
+native operating-system keyring. Android/Termux stores secrets as separate
+atomic files under `~/.skyport/credentials`, inside Termux's app-private home,
+with `0700` directory and `0600` file permissions enforced on every access.
 
 Retrieve tokens only when needed:
 
@@ -21,7 +24,7 @@ skyport auth rotate inference
 
 Provider keys and OAuth tokens are stored in `~/.skyport/vault.json` using a
 versioned AES-256-GCM envelope. The random master key is stored separately in
-the OS keyring. Rotate it with `skyport keys rotate-master`.
+the platform credential store. Rotate it with `skyport keys rotate-master`.
 
 `skyport keys add PROVIDER ALIAS` and `skyport keys replace ALIAS` read secrets
 from a hidden terminal prompt. Secrets are never accepted as command-line
@@ -41,8 +44,8 @@ alias, token counts, latency, and estimated cost. It also contains the fetched
 NVIDIA skill catalog and global enable state, but not the downloaded skill
 files. It does not contain prompts, responses, provider keys, OAuth tokens, or
 gateway tokens. The entire database is encrypted at rest with SQLCipher; its
-random 256-bit key is stored in the OS keyring. Existing plaintext databases
-are migrated automatically.
+random 256-bit key is stored in the platform credential store. Existing
+plaintext databases are migrated automatically.
 Full-disk encryption remains recommended to protect swap, temporary files, and
 disk sectors left by data written before migration.
 

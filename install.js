@@ -14,15 +14,19 @@ const platformBin = `skyport-${process.platform}-${process.arch}${ext}`;
 const destPlatform = join(__dirname, "bin", platformBin);
 const destGeneric = join(__dirname, "bin", binName);
 
-function platformAsset(platform = process.platform, arch = process.arch) {
+function platformAsset(platform = process.platform, arch = process.arch, environment = process.env) {
+  const isAndroid = platform === "android"
+    || (platform === "linux" && Boolean(environment.ANDROID_ROOT || environment.ANDROID_DATA));
+  const effectivePlatform = isAndroid ? "android" : platform;
   const map = {
     "win32-x64": `skyport-x86_64-pc-windows-msvc.exe`,
     "darwin-x64": `skyport-x86_64-apple-darwin`,
     "darwin-arm64": `skyport-aarch64-apple-darwin`,
     "linux-x64": `skyport-x86_64-unknown-linux-gnu`,
     "linux-arm64": `skyport-aarch64-unknown-linux-gnu`,
+    "android-arm64": `skyport-aarch64-linux-android`,
   };
-  return map[`${platform}-${arch}`] || null;
+  return map[`${effectivePlatform}-${arch}`] || null;
 }
 
 function download(url, dest, redirects = 0) {

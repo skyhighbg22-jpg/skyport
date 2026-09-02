@@ -5,9 +5,8 @@ use sha2::{Digest, Sha256};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use subtle::ConstantTimeEq;
 use url::{Host, Url};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
-const KEYRING_SERVICE: &str = "skyport";
 const MAX_UPSTREAM_BODY_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -24,7 +23,7 @@ impl TokenScope {
         }
     }
 
-    fn keyring_user(self) -> &'static str {
+    fn credential_account(self) -> &'static str {
         match self {
             Self::Admin => "admin_token",
             Self::Inference => "inference_token",
@@ -71,16 +70,14 @@ pub fn stored_auth_token(
         TokenScope::Inference => config.server.inference_token_hash.as_deref(),
     }
     .ok_or("Authentication is not initialized")?;
-    let entry = keyring::Entry::new(KEYRING_SERVICE, scope.keyring_user())?;
-    let token = Zeroizing::new(entry.get_password().map_err(|mut error| {
-        if let keyring::Error::BadEncoding(bytes) = &mut error {
-            bytes.zeroize();
-        }
-        format!(
-            "Could not read the {} token from the OS keyring",
-            scope.name()
-        )
-    })?);
+    let token = crate::credential_store::read(scope.credential_account())
+        .map_err(|_| {
+            format!(
+                "Could not read the {} token from secure storage",
+                scope.name()
+            )
+        })?
+        .ok_or_else(|| format!("The stored {} token is missing; rotate it", scope.name()))?;
     if !verify_token(&token, expected) {
         return Err(format!(
             "The stored {} token does not match its configured verifier; rotate it",
@@ -102,10 +99,9 @@ fn generate_and_store_token(
 }
 
 pub fn store_auth_token(scope: TokenScope, token: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, scope.keyring_user())?;
-    entry.set_password(token).map_err(|_| {
+    crate::credential_store::write(scope.credential_account(), token).map_err(|_| {
         format!(
-            "Could not store the {} token in the OS keyring",
+            "Could not store the {} token in secure storage",
             scope.name()
         )
     })?;

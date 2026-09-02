@@ -2,6 +2,7 @@ pub mod activity;
 pub mod api;
 pub mod auth;
 pub mod config;
+pub(crate) mod credential_store;
 pub mod db;
 pub mod provider_table;
 pub mod providers;

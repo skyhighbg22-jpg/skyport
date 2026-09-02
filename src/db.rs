@@ -7,9 +7,8 @@ use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
-const KEYRING_SERVICE: &str = "skyport";
 const TELEMETRY_KEYRING_ACCOUNT: &str = "telemetry_database_key";
 const SQLITE_HEADER: &[u8; 16] = b"SQLite format 3\0";
 
@@ -464,33 +463,29 @@ fn database_is_encrypted(path: &Path) -> Result<bool, Box<dyn std::error::Error>
 fn load_or_create_database_key(
     encrypted_database_exists: bool,
 ) -> Result<Zeroizing<Vec<u8>>, Box<dyn std::error::Error>> {
-    let entry = keyring::Entry::new(KEYRING_SERVICE, TELEMETRY_KEYRING_ACCOUNT)
-        .map_err(|_| "Failed to access telemetry database keyring")?;
-    match entry.get_password() {
-        Ok(password) => {
-            let mut password = Zeroizing::new(password);
+    match crate::credential_store::read(TELEMETRY_KEYRING_ACCOUNT)
+        .map_err(|_| "Failed to access telemetry database credential store")?
+    {
+        Some(password) => {
             let mut key = Zeroizing::new(Vec::with_capacity(32));
             let decoded = BASE64.decode_vec(password.as_bytes(), &mut key);
-            password.zeroize();
             if decoded.is_err() || key.len() != 32 {
-                return Err("Telemetry database key in keyring is invalid".into());
+                return Err("Telemetry database key in credential store is invalid".into());
             }
             Ok(key)
         }
-        Err(keyring::Error::NoEntry) if encrypted_database_exists => {
-            Err("Telemetry database key is missing from the OS keyring".into())
+        None if encrypted_database_exists => {
+            Err("Telemetry database key is missing from the credential store".into())
         }
-        Err(keyring::Error::NoEntry) => {
+        None => {
             use rand::RngCore;
             let mut key = Zeroizing::new(vec![0_u8; 32]);
             rand::thread_rng().fill_bytes(&mut key);
             let encoded = Zeroizing::new(BASE64.encode(key.as_slice()));
-            entry
-                .set_password(encoded.as_str())
-                .map_err(|_| "Failed to store telemetry database key in keyring")?;
+            crate::credential_store::write(TELEMETRY_KEYRING_ACCOUNT, encoded.as_str())
+                .map_err(|_| "Failed to store telemetry database key in credential store")?;
             Ok(key)
         }
-        Err(_) => Err("Failed to access telemetry database keyring".into()),
     }
 }
 

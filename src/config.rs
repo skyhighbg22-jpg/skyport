@@ -79,7 +79,7 @@ pub struct UtilityConfig {
 pub struct ServerConfig {
     #[serde(default = "default_port")]
     pub port: u16,
-    /// SHA-256 verifiers only. Raw tokens live in the native OS keyring.
+    /// SHA-256 verifiers only. Raw tokens live in platform-secure storage.
     #[serde(default)]
     pub admin_token_hash: Option<String>,
     #[serde(default)]
