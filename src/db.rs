@@ -177,7 +177,7 @@ fn init_db_at(path: &Path, key: &[u8]) -> Result<rusqlite::Connection, Box<dyn s
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
     }
 
     conn.execute_batch(
