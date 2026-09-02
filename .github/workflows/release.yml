@@ -73,7 +73,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Build
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $StrawberryPerl = "C:\Strawberry\perl\bin"
+          if (-not (Test-Path "$StrawberryPerl\perl.exe")) {
+            throw "Strawberry Perl is required to build vendored OpenSSL"
+          }
+          $env:Path = "$StrawberryPerl;$env:Path"
+          perl -MLocale::Maketext::Simple -e 1
+          cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
